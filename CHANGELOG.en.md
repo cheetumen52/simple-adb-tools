@@ -4,6 +4,9 @@ All notable changes to Simple ADB tools. The Czech version is in [CHANGELOG.md](
 
 ## [Unreleased]
 
+### Fixed
+- macOS: the app downloaded from GitHub was reported as “damaged”. The whole bundle is now signed, so macOS offers the usual “Open Anyway”.
+
 ## [1.2.0] - 2026-10-14
 
 ### Added

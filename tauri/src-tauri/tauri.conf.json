@@ -60,6 +60,7 @@
     ],
     "macOS": {
       "minimumSystemVersion": "11.0",
+      "signingIdentity": "-",
       "files": {
         "Resources/cs.lproj/InfoPlist.strings": "locales/cs.lproj/InfoPlist.strings",
         "Resources/en.lproj/InfoPlist.strings": "locales/en.lproj/InfoPlist.strings"

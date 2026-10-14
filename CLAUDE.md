@@ -45,4 +45,5 @@ CI (`.github/workflows/ci.yml`) spouští totéž na Linuxu a Windows. Windows k
 - **Vlastní NSIS jazykový soubor ukládej bez BOM.** Tauri přidává vlastní a dvojitý BOM rozbije `makensis`.
 - **TLS je všude `native-tls`**, včetně updateru. `rustls` přes `ring` znemožní kontrolu pro Windows z macOS.
 - **Paralelní joby v release workflow nesmí samy zapisovat `latest.json`.** Skládá ho závěrečný job `updater-manifest`.
+- **macOS balík musí být ad-hoc podepsaný celý** (`bundle.macOS.signingIdentity: "-"`). Bez toho má jen podpis linkeru bez zapečetěných zdrojů a stažená aplikace se hlásí jako „poškozená“ bez možnosti „Přesto otevřít“. Kontrola: `codesign --verify --deep --strict`.
 - **Emulátory** mají sériové číslo `emulator-*`. Patří do seznamu zařízení, ale ne do Wi‑Fi funkcí.
