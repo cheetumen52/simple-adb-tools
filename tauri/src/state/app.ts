@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { getVersion } from "@tauri-apps/api/app";
 import { native, type SystemPaths } from "../lib/native";
+import pkg from "../../package.json";
 
 export type Tab = "requirements" | "install" | "toolset" | "settings";
 
@@ -33,10 +34,10 @@ interface AppState {
 export const useApp = create<AppState>((set) => ({
   tab: "install",
   paths: null,
-  version: "1.1.0",
+  version: pkg.version,
   setTab: (tab) => set({ tab }),
   init: async () => {
-    const [paths, version] = await Promise.all([native.systemPaths(), getVersion().catch(() => "1.1.0")]);
+    const [paths, version] = await Promise.all([native.systemPaths(), getVersion().catch(() => pkg.version)]);
     set({ paths, version });
   },
 }));

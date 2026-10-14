@@ -4,6 +4,8 @@ Všechny podstatné změny Simple ADB tools. Anglická verze je v [CHANGELOG.en.
 
 ## [Nevydáno]
 
+## [1.2.0] - 2026-10-14
+
 ### Přidáno
 - Automatické aktualizace: aplikace sama stáhne novou verzi, ověří její podpis a po kliknutí na „Aktualizovat a restartovat“ ji nainstaluje.
 - Sekce „Poslední APK v zařízení“: 10 naposledy nainstalovaných nebo aktualizovaných aplikací přímo ze zařízení, s přepínačem zařízení a rychlými akcemi.
