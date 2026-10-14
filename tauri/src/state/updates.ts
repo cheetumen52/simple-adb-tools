@@ -3,33 +3,16 @@ import { check as checkSignedUpdate, type Update } from "@tauri-apps/plugin-upda
 import { relaunch } from "@tauri-apps/plugin-process";
 import { BRAND, useApp } from "./app";
 import { log } from "./log";
+import { isOlder, versionParts } from "../lib/version";
 
 export type UpdateState =
   | { kind: "idle" }
   | { kind: "checking" }
   | { kind: "upToDate" }
   /** `autoInstall` = a signed update is ready to download; otherwise only a link to the release. */
-  | { kind: "available"; tag: string; url: string; autoInstall: boolean }
+  | { kind: "available"; tag: string; url: string; autoInstall: boolean; notes: string | null }
   | { kind: "installing"; tag: string; progress: number | null }
   | { kind: "failed"; reason: string };
-
-/** "v1.2.3" → [1, 2, 3]; pre-release tags like "v1.2.0-beta" are ignored. */
-export function versionParts(tag: string): number[] | null {
-  const parts = tag.replace(/^v/i, "").split(".");
-  if (!parts.length || parts.some((p) => !/^\d+$/.test(p))) return null;
-  return parts.map(Number);
-}
-
-export function isOlder(a: string, b: string): boolean {
-  const x = versionParts(a) ?? [0];
-  const y = versionParts(b) ?? [0];
-  for (let i = 0; i < Math.max(x.length, y.length); i++) {
-    const l = x[i] ?? 0;
-    const r = y[i] ?? 0;
-    if (l !== r) return l < r;
-  }
-  return false;
-}
 
 interface UpdatesStore {
   state: UpdateState;
@@ -53,12 +36,12 @@ async function checkReleases(): Promise<UpdateState> {
   if (res.status === 403 || res.status === 429) return { kind: "failed", reason: "GitHub dočasně omezil počet dotazů, zkusím to později." };
   if (!res.ok) return { kind: "failed", reason: `GitHub vrátil HTTP ${res.status}.` };
   // Published releases only: a bare tag (or a draft) has no downloadable installers yet.
-  const releases = ((await res.json()) as { tag_name: string; html_url: string; draft: boolean }[]).filter(
+  const releases = ((await res.json()) as { tag_name: string; html_url: string; draft: boolean; body: string | null }[]).filter(
     (r) => !r.draft && versionParts(r.tag_name),
   );
   const newest = releases.reduce<(typeof releases)[number] | null>((best, r) => (!best || isOlder(best.tag_name, r.tag_name) ? r : best), null);
   if (newest && isOlder(useApp.getState().version, newest.tag_name)) {
-    return { kind: "available", tag: newest.tag_name, url: newest.html_url, autoInstall: false };
+    return { kind: "available", tag: newest.tag_name, url: newest.html_url, autoInstall: false, notes: newest.body };
   }
   return { kind: "upToDate" };
 }
@@ -80,7 +63,7 @@ export const useUpdates = create<UpdatesStore>((set, get) => ({
       pending = await checkSignedUpdate();
       if (pending) {
         const tag = `v${pending.version}`;
-        set({ state: { kind: "available", tag, url: releaseUrl(tag), autoInstall: true }, lastChecked: new Date() });
+        set({ state: { kind: "available", tag, url: releaseUrl(tag), autoInstall: true, notes: pending.body ?? null }, lastChecked: new Date() });
         return;
       }
     } catch {
@@ -96,7 +79,7 @@ export const useUpdates = create<UpdatesStore>((set, get) => ({
   install: async () => {
     const state = get().state;
     if (state.kind !== "available" || !state.autoInstall || !pending) return;
-    const tag = state.tag;
+    const { tag, notes } = state;
     let total = 0;
     let downloaded = 0;
     set({ state: { kind: "installing", tag, progress: null } });
@@ -114,7 +97,7 @@ export const useUpdates = create<UpdatesStore>((set, get) => ({
       await relaunch();
     } catch (e) {
       log("error", `Aktualizace selhala: ${String(e)}`);
-      set({ state: { kind: "available", tag, url: releaseUrl(tag), autoInstall: false } });
+      set({ state: { kind: "available", tag, url: releaseUrl(tag), autoInstall: false, notes } });
     }
   },
 }));
