@@ -252,6 +252,7 @@ select.field { font-family: var(--font); font-size: 12px; cursor: pointer; }
 .progress { height: 4px; border-radius: 4px; background: var(--hairline-strong); overflow: hidden; flex: 1; }
 .progress > div { height: 100%; background: var(--accent); transition: width 0.2s; }
 
+.spin { animation: spin 0.8s linear infinite; }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--hairline-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

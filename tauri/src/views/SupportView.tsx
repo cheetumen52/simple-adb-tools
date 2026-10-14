@@ -13,24 +13,26 @@ function useFlash(): [boolean, () => void] {
 }
 
 function UpdateCard() {
-  const { state, lastChecked, check } = useUpdates();
+  const { state, lastChecked, check, install } = useUpdates();
   const version = useApp((s) => s.version);
   const checked = lastChecked ? `Naposledy ověřeno ${lastChecked.toLocaleTimeString("cs", { hour: "2-digit", minute: "2-digit" })}` : null;
   const title =
     state.kind === "checking" ? "Hledám novou verzi…"
     : state.kind === "upToDate" ? `Máš nejnovější verzi ${version}`
     : state.kind === "available" ? `K dispozici je verze ${state.tag}`
+    : state.kind === "installing" ? `Instaluji verzi ${state.tag}…`
     : state.kind === "failed" ? "Aktualizace se nepodařilo ověřit"
     : `Verze ${version}`;
   const subtitle =
     state.kind === "failed" ? state.reason
-    : state.kind === "available" ? `Nainstalováno ${version}. ${checked ?? ""}`
+    : state.kind === "available" ? (state.autoInstall ? `Nainstalováno ${version}. Stáhnu ji, ověřím podpis a appku restartuji.` : `Nainstalováno ${version}. ${checked ?? ""}`)
+    : state.kind === "installing" ? (state.progress != null ? `Staženo ${Math.round(state.progress * 100)} %` : "Připravuji stažení…")
     : checked ?? `Kontroluji vydání v repozitáři ${BRAND.repo} na GitHubu.`;
   return (
-    <Card highlight={state.kind === "available"}>
+    <Card highlight={state.kind === "available" || state.kind === "installing"}>
       <div className="row" style={{ gap: 14 }}>
         <div style={{ width: 26, display: "flex", justifyContent: "center" }}>
-          {state.kind === "checking" ? <Spinner />
+          {state.kind === "checking" || state.kind === "installing" ? <Spinner />
             : state.kind === "available" ? <Sparkles size={20} color="var(--accent)" />
             : state.kind === "upToDate" ? <BadgeCheck size={20} color="var(--light-cyan)" />
             : <HelpCircle size={20} color="var(--text-muted)" />}
@@ -40,10 +42,14 @@ function UpdateCard() {
           <span className="title-sm">{title}</span>
           <span className="caption">{subtitle}</span>
         </div>
-        {state.kind === "available" && (
+        {state.kind === "available" && state.autoInstall && (
+          <Button variant="primary" small icon={<ArrowDownCircle size={13} />} onClick={() => void install()}>Aktualizovat a restartovat</Button>
+        )}
+        {state.kind === "available" && !state.autoInstall && (
           <Button variant="primary" small icon={<ArrowDownCircle size={13} />} onClick={() => void openUrl(state.url)}>Stáhnout {state.tag}</Button>
         )}
-        <Button small icon={<RefreshCw size={13} />} disabled={state.kind === "checking"} onClick={() => void check()}>Zkontrolovat</Button>
+        {state.kind === "installing" && state.progress != null && <span className="mono c-accent">{Math.round(state.progress * 100)} %</span>}
+        <Button small icon={<RefreshCw size={13} />} disabled={state.kind === "checking" || state.kind === "installing"} onClick={() => void check()}>Zkontrolovat</Button>
       </div>
     </Card>
   );

@@ -11,7 +11,7 @@ import { useUpdates } from "./state/updates";
 import { useToolset } from "./state/toolset";
 import { useDrag, type DropTarget } from "./state/drag";
 import { native } from "./lib/native";
-import { BrandMark, Button, Kicker } from "./components/ui";
+import { BrandMark, Button, Kicker, Spinner } from "./components/ui";
 import { RequirementsView } from "./views/RequirementsView";
 import { InstallView } from "./views/InstallView";
 import { ToolsetView } from "./views/ToolsetView";
@@ -68,8 +68,19 @@ function Header() {
       </div>
       <div className="spacer" data-tauri-drag-region />
       {update.kind === "available" && (
-        <Button variant="primary" small icon={<Sparkles size={13} />} onClick={() => void openUrl(update.url)} title={`Nová verze ${update.tag} – otevře stránku na GitHubu`}>
-          <span className="update-text">Nová verze </span>{update.tag}
+        <Button
+          variant="primary"
+          small
+          icon={<Sparkles size={13} />}
+          onClick={() => (update.autoInstall ? void useUpdates.getState().install() : void openUrl(update.url))}
+          title={update.autoInstall ? `Nainstalovat verzi ${update.tag} a restartovat` : `Nová verze ${update.tag} – otevře stránku na GitHubu`}
+        >
+          <span className="update-text">{update.autoInstall ? "Aktualizovat na " : "Nová verze "}</span>{update.tag}
+        </Button>
+      )}
+      {update.kind === "installing" && (
+        <Button variant="primary" small icon={<Spinner />} disabled>
+          {update.progress != null ? `${Math.round(update.progress * 100)} %` : "Stahuji…"}
         </Button>
       )}
       <nav className="tabs">
@@ -94,8 +105,7 @@ export default function App() {
       // F5 would reload the webview and wipe all state; make it refresh devices and APKs instead.
       if (e.key === "F5") {
         e.preventDefault();
-        void useInstaller.getState().refreshDevices();
-        void useInstaller.getState().scanApks();
+        void useInstaller.getState().manualRefresh();
         return;
       }
       if (!(e.metaKey || e.ctrlKey)) return;

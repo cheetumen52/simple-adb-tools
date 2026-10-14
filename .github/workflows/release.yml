@@ -56,7 +56,11 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          # latest.json is assembled once by the updater-manifest job; parallel jobs would race on it.
+          includeUpdaterJson: false
           projectPath: tauri
           args: ${{ matrix.args }}
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
@@ -78,4 +82,51 @@ jobs:
             tauri/src-tauri/target/**/release/bundle/nsis/*.exe
             tauri/src-tauri/target/**/release/bundle/msi/*.msi
             tauri/src-tauri/target/**/release/bundle/dmg/*.dmg
+            tauri/src-tauri/target/**/release/bundle/**/*.sig
+            tauri/src-tauri/target/**/release/bundle/macos/*.app.tar.gz
           if-no-files-found: error
+
+  updater-manifest:
+    # Builds latest.json for the in-app updater from the signatures every platform uploaded.
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assemble and upload latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir sigs
+          gh release download "$TAG" --repo "$REPO" --pattern '*.sig' --dir sigs
+          python3 - <<'PY'
+          import json, os, datetime
+          repo, tag = os.environ["REPO"], os.environ["TAG"]
+          base = f"https://github.com/{repo}/releases/download/{tag}/"
+          targets = {
+              "darwin-aarch64": lambda n: n.endswith("_aarch64.app.tar.gz.sig"),
+              "darwin-x86_64": lambda n: n.endswith("_x64.app.tar.gz.sig"),
+              "windows-x86_64": lambda n: n.endswith("-setup.exe.sig"),
+          }
+          platforms = {}
+          for name in sorted(os.listdir("sigs")):
+              for platform, match in targets.items():
+                  if match(name):
+                      platforms[platform] = {
+                          "signature": open(os.path.join("sigs", name)).read().strip(),
+                          "url": base + name[: -len(".sig")],
+                      }
+          missing = set(targets) - set(platforms)
+          if missing:
+              raise SystemExit(f"Missing updater signatures for: {sorted(missing)}")
+          manifest = {
+              "version": tag.lstrip("v"),
+              "notes": f"Simple ADB tools {tag}",
+              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": platforms,
+          }
+          json.dump(manifest, open("latest.json", "w"), indent=2)
+          print(json.dumps(manifest, indent=2))
+          PY
+          gh release upload "$TAG" latest.json --repo "$REPO" --clobber

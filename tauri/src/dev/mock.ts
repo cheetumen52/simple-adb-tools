@@ -26,6 +26,8 @@ function runTool(tool: string, args: string[]): { status: number; output: string
     return ok(`List of devices attached\n${HUAWEI}       device usb:2-1 product:MAR-LX1AEEA model:MAR_LX1A device:HWMAR transport_id:1\n${SAMSUNG}            device usb:1-1 product:m13nseea model:SM_M135F device:m13 transport_id:2\nemulator-5554          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:3\n`);
   if (joined.includes("getprop ro.build.version.release; getprop ro.product.manufacturer"))
     return ok(joined.includes(HUAWEI) ? `10\nHUAWEI\n${HUAWEI}\n` : joined.includes("emulator") ? `15\nGoogle\nEMULATOR35X1X11X0\n` : `14\nsamsung\n${SAMSUNG}\n`);
+  if (joined.includes("echo @@third; pm list packages -3; echo @@dump"))
+    return ok(`@@third\n${list(packages)}\n@@dump\n  Package [com.cuppka.app.dev] (a):\n    versionName=1.10.1\n    firstInstallTime=2026-09-25 12:44:41\n    lastUpdateTime=${new Date(now - 8 * 60000).toISOString().slice(0, 19).replace("T", " ")}\n  Package [cz.sportovec2.app.dev] (b):\n    versionName=1.0.0\n    firstInstallTime=2026-10-10 09:00:00\n    lastUpdateTime=2026-10-10 09:00:00\n  Package [com.cuppka.app] (c):\n    versionName=1.9.1\n    firstInstallTime=2026-09-25 12:44:41\n    lastUpdateTime=2026-10-06 15:12:00\n  Package [cz.seznam.mapy] (d):\n    versionName=10.2\n    firstInstallTime=2025-01-02 10:00:00\n    lastUpdateTime=2026-09-30 08:00:00\n  Package [com.android.settings] (e):\n    versionName=10\n    firstInstallTime=2018-08-07 18:01:00\n    lastUpdateTime=2026-10-14 08:00:00\n`);
   if (joined.includes("dumpsys package com.cuppka.app.dev") || joined.includes("dumpsys package 'com.cuppka.app.dev'"))
     return ok(`Package [com.cuppka.app.dev] (abc):\n    versionCode=261008925 minSdk=24 targetSdk=35\n    versionName=1.10.1\n    firstInstallTime=2026-10-13 14:27:43\n    lastUpdateTime=2026-10-14 08:57:34\n`);
   if (joined.includes("dumpsys package")) return ok("");
@@ -44,6 +46,10 @@ mockIPC(
     switch (cmd) {
       case "plugin:app|version":
         return "1.1.0";
+      case "plugin:updater|check":
+        return new URLSearchParams(location.search).has("autoupdate")
+          ? { rid: 1, currentVersion: "1.1.0", version: "1.2.0", date: null, body: "", rawJson: {} }
+          : null;
       case "system_paths":
         return { home: "/Users/zdenek", desktop: "/Users/zdenek/Desktop", downloads: "/Users/zdenek/Downloads", platform: "macos" };
       case "toolchain_check":
