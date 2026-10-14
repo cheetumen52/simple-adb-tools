@@ -4,6 +4,8 @@ All notable changes to Simple ADB tools. The Czech version is in [CHANGELOG.md](
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-14
+
 ### Added
 - Automatic updates: the app downloads a new version by itself, verifies its signature and installs it when you click “Update and restart”.
 - “Recent APKs on device” section: the 10 most recently installed or updated apps straight from the device, with a device switcher and quick actions.
