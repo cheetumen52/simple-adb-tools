@@ -68,5 +68,6 @@ Nastavení se ukládá do `localStorage` (`lib/storage.ts`) a každé čtení m�
 
 - `tauri/src/lib/*.test.ts`: parsery na reálných výstupech adb, aapt2 a dumpsys, verze, changelog, formátování, cesty.
 - `cargo test`: řazení verzí, výběr APK z argumentů, rozbalování ZIP (včetně ochrany proti path traversal), TCP sonda.
-- `.github/workflows/ci.yml` běží na každý push a PR: typy, testy, build frontendu, kontrola changelogu, `cargo fmt`, `clippy` a testy na Linuxu i Windows.
+- `scripts/check-secrets.py` hledá tajné údaje: v pre-commit hooku ve staged souborech, v CI v celém repozitáři a v sestaveném frontendu, který se balí do aplikace.
+- `.github/workflows/ci.yml` běží na každý push a PR: kontrola tajných údajů, typy, testy, build frontendu, kontrola changelogu, `cargo fmt`, `clippy` a testy na Linuxu i Windows.
 - `.github/workflows/release.yml` nejdřív spustí CI, pak sestaví instalátory. Viz [RELEASING.md](RELEASING.md).
