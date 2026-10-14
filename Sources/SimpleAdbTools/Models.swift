@@ -13,6 +13,7 @@ struct Device: Identifiable, Hashable {
 struct DeviceDetails: Hashable {
     let android: String
     let manufacturer: String
+    var hardwareSerial: String?
 }
 
 struct ApkFile: Identifiable, Hashable {

@@ -33,6 +33,14 @@ struct RequirementsView: View {
                     size: "4,5 MB",
                     status: tools.aapt2
                 )
+                ToolCard(
+                    tool: .scrcpy,
+                    title: "scrcpy",
+                    requirement: "Volitelné",
+                    description: "Zrcadlení obrazovky telefonu na Mac s ovládáním myší a klávesnicí, se zvukem i nahráváním. Open source od Genymobile.",
+                    size: "13 MB",
+                    status: tools.scrcpy
+                )
                 DeviceRequirementCard()
 
                 if let error = tools.installError {
@@ -42,11 +50,16 @@ struct RequirementsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Nástroje stahuji z dl.google.com do ~/Library/Application Support/Simple ADB tools. Stažením souhlasíš s licenčními podmínkami Android SDK.")
+                    Text("adb a aapt2 stahuji z dl.google.com, scrcpy z jeho oficiálních vydání na GitHubu (s kontrolou SHA-256). Vše do ~/Library/Application Support/Simple ADB tools. Stažením adb a aapt2 souhlasíš s licenčními podmínkami Android SDK.")
                         .font(Typo.caption)
                         .foregroundStyle(Palette.textMuted)
-                    Button("Licenční podmínky Android SDK ↗") { NSWorkspace.shared.open(Toolchain.licenseURL) }
-                        .buttonStyle(LinkButtonStyle())
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 16) {
+                        Button("Licenční podmínky Android SDK ↗") { NSWorkspace.shared.open(Toolchain.licenseURL) }
+                            .buttonStyle(LinkButtonStyle())
+                        Button("scrcpy na GitHubu (Apache 2.0) ↗") { NSWorkspace.shared.open(Toolchain.scrcpyProjectURL) }
+                            .buttonStyle(LinkButtonStyle())
+                    }
                 }
                 .padding(.top, 4)
 
@@ -73,9 +86,9 @@ private struct ToolCard: View {
     let status: ToolStatus
 
     var body: some View {
-        Card(highlighted: !status.isReady && status != .checking) {
+        Card(highlighted: tool != .scrcpy && !status.isReady && status != .checking) {
             HStack(alignment: .top, spacing: 14) {
-                StatusIcon(status: status, optional: tool == .aapt2)
+                StatusIcon(status: status, optional: tool != .adb)
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         Text(title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.textLight)

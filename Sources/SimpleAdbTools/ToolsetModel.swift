@@ -3,6 +3,7 @@ import Foundation
 
 enum ToolsetSection: String, CaseIterable, Identifiable {
     case overview = "Přehled"
+    case mirror = "Zrcadlení"
     case apps = "Aplikace"
     case logcat = "Logcat"
     case control = "Ovládání"
@@ -14,6 +15,7 @@ enum ToolsetSection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .overview: "info.circle"
+        case .mirror: "rectangle.on.rectangle"
         case .apps: "square.grid.2x2"
         case .logcat: "text.alignleft"
         case .control: "hand.tap"
@@ -99,6 +101,9 @@ final class ToolsetModel: ObservableObject {
 
     @Published private(set) var packages: [String] = []
     @Published private(set) var loadingPackages = false
+    @Published private(set) var systemPackages: Set<String> = []
+    /// System apps removed for user 0; still on the system partition and restorable.
+    @Published private(set) var removedSystemPackages: [String] = []
     @Published var includeSystem = false
     @Published var packageQuery = ""
     @Published var selectedPackage: String?
@@ -315,14 +320,34 @@ final class ToolsetModel: ObservableObject {
     func loadPackages() {
         guard let device else { return }
         loadingPackages = true
-        let cmd = includeSystem ? "pm list packages" : "pm list packages -3"
+        let script = "echo @@all; pm list packages; echo @@third; pm list packages -3; echo @@system; pm list packages -s; echo @@everything; pm list packages -u"
         Task {
-            let r = await shell(cmd, on: device)
-            packages = r.output.split(separator: "\n")
-                .compactMap { $0.hasPrefix("package:") ? String($0.dropFirst(8)).trimmingCharacters(in: .whitespaces) : nil }
-                .sorted()
+            let s = Self.sections(await shell(script, on: device).output)
+            func list(_ key: String) -> Set<String> {
+                Set((s[key] ?? "").split(separator: "\n").compactMap {
+                    $0.hasPrefix("package:") ? String($0.dropFirst(8)).trimmingCharacters(in: .whitespaces) : nil
+                })
+            }
+            let all = list("all")
+            systemPackages = list("system")
+            removedSystemPackages = list("everything").subtracting(all).sorted()
+            packages = (includeSystem ? all : list("third")).sorted()
             loadingPackages = false
             if let selected = selectedPackage, !packages.contains(selected) { selectedPackage = nil }
+        }
+    }
+
+    func isSystem(_ pkg: String) -> Bool { systemPackages.contains(pkg) }
+
+    func restoreSystemPackage(_ pkg: String) {
+        guard let device else { return }
+        installer.append(.command, "cmd package install-existing \(pkg) → \(device.displayName)")
+        Task {
+            let r = await shell("cmd package install-existing \(Self.quote(pkg))", on: device)
+            let out = r.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            let ok = r.ok && !out.localizedCaseInsensitiveContains("fail")
+            installer.append(ok ? .success : .error, ok ? "✓ \(pkg) je zpět" : "Obnovení \(pkg) selhalo: \(out)")
+            loadPackages()
         }
     }
 
@@ -358,11 +383,24 @@ final class ToolsetModel: ObservableObject {
 
     func uninstall(_ pkg: String) {
         guard let device else { return }
+        let system = isSystem(pkg)
         Task {
-            let r = await adbRun(["uninstall", pkg], device: device)
-            if r.ok {
-                packages.removeAll { $0 == pkg }
-                if selectedPackage == pkg { selectedPackage = nil }
+            let r: Shell.Result
+            if system {
+                // Removes the app for the current user only; the APK stays on /system so it can be restored.
+                installer.append(.command, "pm uninstall -k --user 0 \(pkg) → \(device.displayName)")
+                r = await shell("pm uninstall -k --user 0 \(Self.quote(pkg))", on: device)
+                let out = r.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !out.isEmpty { installer.append(r.ok && out.contains("Success") ? .output : .error, out) }
+            } else {
+                r = await adbRun(["uninstall", pkg], device: device)
+            }
+            guard r.ok, r.output.contains("Success") else { return }
+            packages.removeAll { $0 == pkg }
+            if selectedPackage == pkg { selectedPackage = nil }
+            if system {
+                removedSystemPackages = (removedSystemPackages + [pkg]).sorted()
+                installer.append(.success, "✓ Systémová aplikace \(pkg) odebrána. Vrátit ji jde přes „Obnovit odebrané“.")
             }
         }
     }
@@ -581,9 +619,9 @@ final class ToolsetModel: ObservableObject {
             let ip = String(out[r].dropFirst(5))
             _ = await adbRun(["tcpip", "5555"], device: device)
             try? await Task.sleep(for: .seconds(2))
-            let c = await adbRun(["connect", "\(ip):5555"])
-            installer.append(c.output.contains("connected") ? .success : .error,
-                             c.output.contains("connected") ? "✓ Připojeno přes Wi‑Fi (\(ip):5555). Kabel můžeš odpojit." : "Připojení přes Wi‑Fi se nepovedlo")
+            if await WirelessManager.shared.connect("\(ip):5555") {
+                installer.append(.success, "✓ Připojeno přes Wi‑Fi (\(ip):5555). Kabel můžeš odpojit.")
+            }
             installer.refreshDevices()
         }
     }
@@ -592,7 +630,9 @@ final class ToolsetModel: ObservableObject {
         let host = connectHost.trimmingCharacters(in: .whitespaces)
         guard !host.isEmpty else { return }
         Task {
-            _ = await adbRun(["connect", host.contains(":") ? host : "\(host):5555"])
+            if await WirelessManager.shared.connect(host.contains(":") ? host : "\(host):5555") {
+                installer.append(.success, "✓ Připojeno přes Wi‑Fi")
+            }
             installer.refreshDevices()
         }
     }
@@ -602,15 +642,33 @@ final class ToolsetModel: ObservableObject {
         let code = pairCode.trimmingCharacters(in: .whitespaces)
         guard !host.isEmpty, !code.isEmpty else { return }
         Task {
-            let r = await adbRun(["pair", host, code])
-            if r.output.localizedCaseInsensitiveContains("success") {
-                installer.append(.success, "✓ Spárováno. Teď se připoj přes adresu z obrazovky Bezdrátové ladění.")
-                pairCode = ""
+            var r = await adbRun(["pair", host, code])
+            if !r.output.localizedCaseInsensitiveContains("success"),
+               let port = host.split(separator: ":").last.flatMap({ UInt16($0) }),
+               await WirelessManager.shared.diagnose(host: String(host.split(separator: ":")[0]), port: port) == .reachable {
+                r = await adbRun(["pair", host, code])
             }
+            guard r.output.localizedCaseInsensitiveContains("success") else { return }
+            pairCode = ""
+            installer.append(.success, "✓ Spárováno, hledám telefon v síti…")
+            // The connect port differs from the pairing port; mDNS advertises it shortly after pairing.
+            let ip = host.split(separator: ":").first.map(String.init) ?? host
+            for _ in 0..<5 {
+                try? await Task.sleep(for: .seconds(1.5))
+                let services = await adbRun(["mdns", "services"], log: false).output
+                if let line = services.split(separator: "\n").first(where: { $0.contains("_adb-tls-connect") && $0.contains(ip) }),
+                   let addr = line.split(whereSeparator: { $0 == "\t" || $0 == " " }).last.map(String.init) {
+                    await WirelessManager.shared.connect(addr)
+                    installer.refreshDevices()
+                    return
+                }
+            }
+            installer.append(.info, "Telefon se v síti neohlásil. Připoj se ručně přes IP adresu a port z obrazovky Bezdrátové ladění.")
         }
     }
 
     func disconnectAll() {
+        WirelessManager.shared.pauseAll()
         Task {
             _ = await adbRun(["disconnect"])
             installer.refreshDevices()

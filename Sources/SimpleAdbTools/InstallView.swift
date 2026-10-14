@@ -33,6 +33,7 @@ struct InstallView: View {
 
 private struct DevicesSection: View {
     @ObservedObject private var model = InstallerModel.shared
+    @ObservedObject private var wireless = WirelessManager.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -53,7 +54,7 @@ private struct DevicesSection: View {
                             .buttonStyle(PrimaryButtonStyle(compact: true))
                     }
                 }
-            } else if model.devices.isEmpty {
+            } else if model.devices.isEmpty && wireless.reconnecting.isEmpty {
                 Card {
                     HStack(spacing: 12) {
                         Image(systemName: "cable.connector").font(.system(size: 18)).foregroundStyle(Palette.textMuted)
@@ -68,12 +69,27 @@ private struct DevicesSection: View {
             ForEach(model.devices) { device in
                 DeviceRow(device: device)
             }
+            ForEach(wireless.reconnecting) { known in
+                Card(padding: 12) {
+                    HStack(spacing: 12) {
+                        ProgressView().controlSize(.small).frame(width: 18)
+                        Image(systemName: "wifi.exclamationmark").font(.system(size: 18)).foregroundStyle(Palette.warn).frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(known.name).font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Palette.textLight)
+                            Text("Wi‑Fi spojení spadlo, obnovuji ho…").font(Typo.caption).foregroundStyle(Palette.textSecondary)
+                        }
+                        Spacer()
+                        StatusPill(text: "Obnovuji", color: Palette.warn)
+                    }
+                }
+            }
         }
     }
 }
 
 private struct DeviceRow: View {
     @ObservedObject private var model = InstallerModel.shared
+    @ObservedObject private var mirror = MirrorController.shared
     let device: Device
 
     var body: some View {
@@ -101,6 +117,13 @@ private struct DeviceRow: View {
                 }
                 Spacer()
                 if device.ready {
+                    if mirror.isAvailable {
+                        Button { mirror.toggle(device) } label: {
+                            Image(systemName: mirror.isMirroring(device) ? "rectangle.on.rectangle.slash" : "rectangle.on.rectangle")
+                        }
+                        .buttonStyle(GhostButtonStyle(compact: true))
+                        .help(mirror.isMirroring(device) ? "Ukončit zrcadlení" : "Zrcadlit obrazovku na Mac")
+                    }
                     Button { model.screenshot(device) } label: { Image(systemName: "camera") }
                         .buttonStyle(GhostButtonStyle(compact: true))
                         .help("Screenshot z telefonu na plochu")

@@ -15,6 +15,13 @@
   <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
   <key>NSHumanReadableCopyright</key><string>© 2026 Hejzlar Development</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSLocalNetworkUsageDescription</key><string>Simple ADB tools se přes místní síť připojují k telefonům s laděním přes Wi‑Fi.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_adb._tcp</string>
+    <string>_adb-tls-connect._tcp</string>
+    <string>_adb-tls-pairing._tcp</string>
+  </array>
   <key>CFBundleDocumentTypes</key>
   <array>
     <dict>

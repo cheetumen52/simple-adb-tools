@@ -124,11 +124,12 @@ final class InstallerModel: ObservableObject {
         guard let adb = toolchain.adbPath else { return }
         details[device.serial] = DeviceDetails(android: "…", manufacturer: "")
         Task {
-            let r = await Shell.runAsync(adb, ["-s", device.serial, "shell", "getprop ro.build.version.release; getprop ro.product.manufacturer"])
+            let r = await Shell.runAsync(adb, ["-s", device.serial, "shell", "getprop ro.build.version.release; getprop ro.product.manufacturer; getprop ro.serialno"])
             let lines = r.output.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             details[device.serial] = DeviceDetails(
                 android: lines.first ?? "?",
-                manufacturer: lines.count > 1 ? lines[1].capitalized : ""
+                manufacturer: lines.count > 1 ? lines[1].capitalized : "",
+                hardwareSerial: lines.count > 2 && !lines[2].isEmpty ? lines[2] : nil
             )
         }
     }
@@ -353,6 +354,9 @@ final class InstallerModel: ObservableObject {
 
     private func waitForTargets(_ adb: String) async -> [Device]? {
         if !targets.isEmpty { return targets }
+        // The list may be stale (e.g. right after launch); a restart would also drop Wi‑Fi connections.
+        applyDevices(Self.parseDevices(await Shell.runAsync(adb, ["devices", "-l"]).output))
+        if !targets.isEmpty { return targets }
         if !readyDevices.isEmpty {
             append(.error, "Žádné zařízení není vybrané. Zaškrtni telefon v seznamu.")
             return nil
@@ -486,6 +490,7 @@ final class InstallerModel: ObservableObject {
             "macOS \(os)",
             "adb: \(describe(toolchain.adb))",
             "aapt2: \(describe(toolchain.aapt2))",
+            "scrcpy: \(describe(toolchain.scrcpy))",
         ]
         for d in devices {
             let det = details[d.serial].map { " · Android \($0.android) · \($0.manufacturer)" } ?? ""

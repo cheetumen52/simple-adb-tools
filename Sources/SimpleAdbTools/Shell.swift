@@ -62,7 +62,7 @@ enum Shell {
 }
 
 /// Splits a byte stream into trimmed lines; called from pipe and termination threads, hence the lock.
-private final class LineCollector: @unchecked Sendable {
+final class LineCollector: @unchecked Sendable {
     private let lock = NSLock()
     private let onLine: (String) -> Void
     private var buffer = Data()

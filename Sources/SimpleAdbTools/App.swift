@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             InstallerModel.shared.start()
             UpdateChecker.shared.start()
+            WirelessManager.shared.start()
         }
     }
 
@@ -19,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated { MirrorController.shared.stopAll() }
+    }
 }
 
 @main
