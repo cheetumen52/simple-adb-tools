@@ -1,0 +1,8 @@
+#!/bin/sh
+# Blocks commits that contain credentials. Enabled by `npm install` in tauri/ (core.hooksPath=.githooks).
+py="$(command -v python3 || command -v python)"
+if [ -z "$py" ]; then
+  echo "pre-commit: Python not found, secret scan skipped" >&2
+  exit 0
+fi
+exec "$py" "$(git rev-parse --show-toplevel)/scripts/check-secrets.py" --staged
