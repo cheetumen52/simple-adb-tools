@@ -1,4 +1,4 @@
-﻿LangString addOrReinstall ${LANG_CZECH} "Přidat nebo přeinstalovat součásti"
+LangString addOrReinstall ${LANG_CZECH} "Přidat nebo přeinstalovat součásti"
 LangString alreadyInstalled ${LANG_CZECH} "Již nainstalováno"
 LangString alreadyInstalledLong ${LANG_CZECH} "${PRODUCTNAME} ${VERSION} je již nainstalován. Vyberte, co chcete udělat, a pokračujte tlačítkem Další."
 LangString appRunning ${LANG_CZECH} "{{product_name}} je spuštěný. Nejdřív ho zavřete a zkuste to znovu."
