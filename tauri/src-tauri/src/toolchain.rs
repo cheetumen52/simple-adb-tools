@@ -38,7 +38,11 @@ impl Tool {
     }
 
     fn exe(self) -> String {
-        if cfg!(windows) { format!("{}.exe", self.name()) } else { self.name().to_string() }
+        if cfg!(windows) {
+            format!("{}.exe", self.name())
+        } else {
+            self.name().to_string()
+        }
     }
 }
 
@@ -46,8 +50,15 @@ impl Tool {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ToolStatus {
     Missing,
-    Found { path: String, version: String, managed: bool },
-    Broken { path: String, error: String },
+    Found {
+        path: String,
+        version: String,
+        managed: bool,
+    },
+    Broken {
+        path: String,
+        error: String,
+    },
 }
 
 #[derive(Default)]
@@ -62,7 +73,10 @@ impl Toolchain {
 }
 
 fn managed_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path().app_data_dir().map(|d| d.join("tools")).map_err(|e| e.to_string())
+    app.path()
+        .app_data_dir()
+        .map(|d| d.join("tools"))
+        .map_err(|e| e.to_string())
 }
 
 fn sdk_roots(app: &AppHandle) -> Vec<PathBuf> {
@@ -77,17 +91,19 @@ fn sdk_roots(app: &AppHandle) -> Vec<PathBuf> {
             roots.push(home.join("Android/Sdk"));
         }
     }
-    if cfg!(windows) {
-        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            roots.push(PathBuf::from(local).join("Android").join("Sdk"));
-        }
+    if cfg!(windows)
+        && let Some(local) = std::env::var_os("LOCALAPPDATA")
+    {
+        roots.push(PathBuf::from(local).join("Android").join("Sdk"));
     }
     roots
 }
 
 /// GUI apps on macOS get a minimal PATH, so the usual Homebrew prefixes are added explicitly.
 fn path_dirs() -> Vec<PathBuf> {
-    let mut dirs: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
+    let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect())
+        .unwrap_or_default();
     if cfg!(target_os = "macos") {
         dirs.push("/opt/homebrew/bin".into());
         dirs.push("/usr/local/bin".into());
@@ -104,7 +120,11 @@ fn candidates(app: &AppHandle, tool: Tool, custom_adb: Option<&str>) -> Vec<Path
             if let Some(custom) = custom_adb.filter(|c| !c.is_empty()) {
                 list.push(PathBuf::from(custom));
             }
-            list.extend(sdk_roots(app).into_iter().map(|r| r.join("platform-tools").join(&exe)));
+            list.extend(
+                sdk_roots(app)
+                    .into_iter()
+                    .map(|r| r.join("platform-tools").join(&exe)),
+            );
             if let Some(m) = &managed {
                 list.push(m.join("platform-tools").join(&exe));
             }
@@ -113,7 +133,11 @@ fn candidates(app: &AppHandle, tool: Tool, custom_adb: Option<&str>) -> Vec<Path
             for root in sdk_roots(app) {
                 let dir = root.join("build-tools");
                 let mut versions: Vec<String> = std::fs::read_dir(&dir)
-                    .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().into_owned()).collect())
+                    .map(|rd| {
+                        rd.filter_map(|e| e.ok())
+                            .map(|e| e.file_name().to_string_lossy().into_owned())
+                            .collect()
+                    })
                     .unwrap_or_default();
                 versions.sort_by(|a, b| compare_versions(b, a));
                 list.extend(versions.into_iter().map(|v| dir.join(v).join(&exe)));
@@ -133,7 +157,11 @@ fn candidates(app: &AppHandle, tool: Tool, custom_adb: Option<&str>) -> Vec<Path
 }
 
 fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
-    let parse = |s: &str| -> Vec<u64> { s.split(|c: char| !c.is_ascii_digit()).filter_map(|p| p.parse().ok()).collect() };
+    let parse = |s: &str| -> Vec<u64> {
+        s.split(|c: char| !c.is_ascii_digit())
+            .filter_map(|p| p.parse().ok())
+            .collect()
+    };
     parse(a).cmp(&parse(b))
 }
 
@@ -141,26 +169,51 @@ async fn probe(tool: Tool, path: &Path, managed_root: Option<&Path>) -> Option<T
     if !path.is_file() {
         return None;
     }
-    let arg = if tool == Tool::Scrcpy { "--version" } else { "version" };
+    let arg = if tool == Tool::Scrcpy {
+        "--version"
+    } else {
+        "version"
+    };
     let managed = managed_root.is_some_and(|m| path.starts_with(m));
     match command(path).arg(arg).output().await {
         Ok(out) if out.status.success() => {
-            let text = String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr);
+            let text = String::from_utf8_lossy(&out.stdout).into_owned()
+                + &String::from_utf8_lossy(&out.stderr);
             let version = match tool {
-                Tool::Adb => text.lines().find_map(|l| l.strip_prefix("Version ")).unwrap_or("?").to_string(),
+                Tool::Adb => text
+                    .lines()
+                    .find_map(|l| l.strip_prefix("Version "))
+                    .unwrap_or("?")
+                    .to_string(),
                 Tool::Aapt2 => text.split_whitespace().last().unwrap_or("?").to_string(),
-                Tool::Scrcpy => text.lines().next().and_then(|l| l.split_whitespace().nth(1)).unwrap_or("?").to_string(),
+                Tool::Scrcpy => text
+                    .lines()
+                    .next()
+                    .and_then(|l| l.split_whitespace().nth(1))
+                    .unwrap_or("?")
+                    .to_string(),
             };
-            Some(ToolStatus::Found { path: path.display().to_string(), version, managed })
+            Some(ToolStatus::Found {
+                path: path.display().to_string(),
+                version,
+                managed,
+            })
         }
         Ok(out) => {
             let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
             Some(ToolStatus::Broken {
                 path: path.display().to_string(),
-                error: if err.is_empty() { format!("exit {}", out.status.code().unwrap_or(-1)) } else { err },
+                error: if err.is_empty() {
+                    format!("exit {}", out.status.code().unwrap_or(-1))
+                } else {
+                    err
+                },
             })
         }
-        Err(e) => Some(ToolStatus::Broken { path: path.display().to_string(), error: e.to_string() }),
+        Err(e) => Some(ToolStatus::Broken {
+            path: path.display().to_string(),
+            error: e.to_string(),
+        }),
     }
 }
 
@@ -202,7 +255,9 @@ struct Progress {
 pub async fn toolchain_install(app: AppHandle, tool: String) -> Result<(), String> {
     let tool = Tool::parse(&tool).ok_or("Neznámý nástroj")?;
     let dir = managed_dir(&app)?;
-    tokio::fs::create_dir_all(&dir).await.map_err(|e| e.to_string())?;
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| e.to_string())?;
     match tool {
         Tool::Adb => install_platform_tools(&app, &dir).await,
         Tool::Aapt2 => install_aapt2(&app, &dir).await,
@@ -223,7 +278,9 @@ async fn download(app: &AppHandle, tool: Tool, url: &str, dest: &Path) -> Result
         return Err(format!("Server vrátil HTTP {}", response.status().as_u16()));
     }
     let total = response.content_length().unwrap_or(0);
-    let mut file = tokio::fs::File::create(dest).await.map_err(|e| e.to_string())?;
+    let mut file = tokio::fs::File::create(dest)
+        .await
+        .map_err(|e| e.to_string())?;
     let mut stream = response.bytes_stream();
     let mut written: u64 = 0;
     let mut last_emit = 0.0;
@@ -235,7 +292,13 @@ async fn download(app: &AppHandle, tool: Tool, url: &str, dest: &Path) -> Result
             let progress = written as f64 / total as f64;
             if progress - last_emit >= 0.01 || progress >= 1.0 {
                 last_emit = progress;
-                let _ = app.emit("install-progress", Progress { tool: tool.name().into(), progress });
+                let _ = app.emit(
+                    "install-progress",
+                    Progress {
+                        tool: tool.name().into(),
+                        progress,
+                    },
+                );
             }
         }
     }
@@ -254,7 +317,10 @@ fn platform_suffix() -> &'static str {
 }
 
 async fn install_platform_tools(app: &AppHandle, dir: &Path) -> Result<(), String> {
-    let url = format!("https://dl.google.com/android/repository/platform-tools-latest-{}.zip", platform_suffix());
+    let url = format!(
+        "https://dl.google.com/android/repository/platform-tools-latest-{}.zip",
+        platform_suffix()
+    );
     let archive = dir.join("platform-tools.download");
     download(app, Tool::Adb, &url, &archive).await?;
     let target = dir.to_path_buf();
@@ -293,7 +359,9 @@ async fn install_aapt2(app: &AppHandle, dir: &Path) -> Result<(), String> {
             let build = parts.next().unwrap_or("");
             parts.next().is_none()
                 && semver.split('.').count() == 3
-                && semver.split('.').all(|p| p.chars().all(|c| c.is_ascii_digit()))
+                && semver
+                    .split('.')
+                    .all(|p| p.chars().all(|c| c.is_ascii_digit()))
                 && !build.is_empty()
                 && build.chars().all(|c| c.is_ascii_digit())
         })
@@ -316,7 +384,9 @@ async fn install_aapt2(app: &AppHandle, dir: &Path) -> Result<(), String> {
         let file = std::fs::File::open(&archive_clone).map_err(|e| e.to_string())?;
         let mut zip = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
         let name = Tool::Aapt2.exe();
-        let mut entry = zip.by_name(&name).map_err(|_| format!("V archivu chybí {name}"))?;
+        let mut entry = zip
+            .by_name(&name)
+            .map_err(|_| format!("V archivu chybí {name}"))?;
         let mut bytes = Vec::new();
         entry.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
         let dest = out_dir.join(&name);
@@ -351,7 +421,14 @@ async fn install_scrcpy(app: &AppHandle, dir: &Path) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?;
     let (prefix, suffix) = if cfg!(target_os = "macos") {
-        (if cfg!(target_arch = "aarch64") { "scrcpy-macos-aarch64-" } else { "scrcpy-macos-x86_64-" }, ".tar.gz")
+        (
+            if cfg!(target_arch = "aarch64") {
+                "scrcpy-macos-aarch64-"
+            } else {
+                "scrcpy-macos-x86_64-"
+            },
+            ".tar.gz",
+        )
     } else if cfg!(windows) {
         ("scrcpy-win64-", ".zip")
     } else {
@@ -399,10 +476,16 @@ async fn install_scrcpy(app: &AppHandle, dir: &Path) -> Result<(), String> {
             extract_zip(&archive_clone, &tmp)?;
         } else {
             let file = std::fs::File::open(&archive_clone).map_err(|e| e.to_string())?;
-            tar::Archive::new(flate2::read::GzDecoder::new(file)).unpack(&tmp).map_err(|e| e.to_string())?;
+            tar::Archive::new(flate2::read::GzDecoder::new(file))
+                .unpack(&tmp)
+                .map_err(|e| e.to_string())?;
         }
-        let binary = find_file(&tmp, &Tool::Scrcpy.exe()).ok_or("V archivu scrcpy chybí binárka.")?;
-        let folder = binary.parent().ok_or("Neplatná struktura archivu.")?.to_path_buf();
+        let binary =
+            find_file(&tmp, &Tool::Scrcpy.exe()).ok_or("V archivu scrcpy chybí binárka.")?;
+        let folder = binary
+            .parent()
+            .ok_or("Neplatná struktura archivu.")?
+            .to_path_buf();
         let _ = std::fs::remove_dir_all(&target);
         // The binary needs scrcpy-server (and on Windows its DLLs) next to it, so keep the whole folder.
         std::fs::rename(&folder, &target).map_err(|e| e.to_string())?;
@@ -420,7 +503,9 @@ fn extract_zip(archive: &Path, dest: &Path) -> Result<(), String> {
     let mut zip = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i).map_err(|e| e.to_string())?;
-        let Some(relative) = entry.enclosed_name() else { continue };
+        let Some(relative) = entry.enclosed_name() else {
+            continue;
+        };
         let out = dest.join(relative);
         if entry.is_dir() {
             std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
@@ -458,8 +543,72 @@ fn set_executable(path: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| e.to_string())?;
     }
     let _ = path;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("sat-test-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn build_tools_versions_sort_numerically() {
+        let mut v = vec!["9.0.0", "37.0.0", "36.1.0", "36.0.0"];
+        v.sort_by(|a, b| compare_versions(b, a));
+        assert_eq!(v, ["37.0.0", "36.1.0", "36.0.0", "9.0.0"]);
+        assert_eq!(
+            compare_versions("8.7.3-12006047", "8.7.3-9"),
+            std::cmp::Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn tool_names_round_trip() {
+        for tool in [Tool::Adb, Tool::Aapt2, Tool::Scrcpy] {
+            assert_eq!(Tool::parse(tool.name()), Some(tool));
+        }
+        assert_eq!(Tool::parse("rm"), None);
+    }
+
+    #[test]
+    fn zip_extraction_keeps_layout_and_blocks_traversal() {
+        let dir = temp_dir("zip");
+        let archive = dir.join("a.zip");
+        {
+            let mut zip = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+            let opts = zip::write::SimpleFileOptions::default().unix_permissions(0o755);
+            zip.start_file("platform-tools/adb", opts).unwrap();
+            zip.write_all(b"#!/bin/sh\n").unwrap();
+            zip.start_file("../escape.txt", opts).unwrap();
+            zip.write_all(b"nope").unwrap();
+            zip.finish().unwrap();
+        }
+        let out = dir.join("out");
+        extract_zip(&archive, &out).unwrap();
+        let adb = out.join("platform-tools/adb");
+        assert!(adb.is_file());
+        assert!(!dir.join("escape.txt").exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                std::fs::metadata(&adb).unwrap().permissions().mode() & 0o777,
+                0o755
+            );
+        }
+        assert_eq!(find_file(&out, "adb"), Some(adb));
+        assert_eq!(find_file(&out, "scrcpy"), None);
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }

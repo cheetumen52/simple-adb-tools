@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, BufReader},
     process::Command,
-    sync::{mpsc, oneshot, Mutex},
+    sync::{Mutex, mpsc, oneshot},
 };
 
 use crate::toolchain::{Tool, Toolchain};
@@ -54,10 +54,10 @@ async fn prepare(toolchain: &Toolchain, tool: &str) -> Result<Command, String> {
         .ok_or_else(|| format!("{} není k dispozici", tool.name()))?;
     let mut cmd = command(&path);
     // scrcpy must talk to the same adb binary, otherwise two adb versions keep killing each other's server.
-    if tool == Tool::Scrcpy {
-        if let Some(adb) = toolchain.path(Tool::Adb).await {
-            cmd.env("ADB", adb);
-        }
+    if tool == Tool::Scrcpy
+        && let Some(adb) = toolchain.path(Tool::Adb).await
+    {
+        cmd.env("ADB", adb);
     }
     Ok(cmd)
 }
@@ -70,18 +70,30 @@ pub async fn run_tool(
     timeout_ms: Option<u64>,
 ) -> Result<RunResult, String> {
     let mut cmd = prepare(&toolchain, &tool).await?;
-    cmd.args(&args).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     let child = cmd.spawn().map_err(|e| e.to_string())?;
     let output = match timeout_ms {
-        Some(ms) => match tokio::time::timeout(Duration::from_millis(ms), child.wait_with_output()).await {
-            Ok(result) => result.map_err(|e| e.to_string())?,
-            Err(_) => return Ok(RunResult { status: -2, output: "Časový limit vypršel".into() }),
-        },
+        Some(ms) => {
+            match tokio::time::timeout(Duration::from_millis(ms), child.wait_with_output()).await {
+                Ok(result) => result.map_err(|e| e.to_string())?,
+                Err(_) => {
+                    return Ok(RunResult {
+                        status: -2,
+                        output: "Časový limit vypršel".into(),
+                    });
+                }
+            }
+        }
         None => child.wait_with_output().await.map_err(|e| e.to_string())?,
     };
     let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
     text.push_str(&String::from_utf8_lossy(&output.stderr));
-    Ok(RunResult { status: output.status.code().unwrap_or(-1), output: text })
+    Ok(RunResult {
+        status: output.status.code().unwrap_or(-1),
+        output: text,
+    })
 }
 
 /// Writes raw stdout to a file (e.g. `adb exec-out screencap -p`); `output` carries stderr.
@@ -96,14 +108,22 @@ pub async fn run_tool_to_file(
     let output = cmd.args(&args).output().await.map_err(|e| e.to_string())?;
     let png = output.stdout.starts_with(&[0x89, b'P', b'N', b'G']);
     if output.status.success() && !output.stdout.is_empty() && (png || !path.ends_with(".png")) {
-        tokio::fs::write(&path, &output.stdout).await.map_err(|e| e.to_string())?;
-        return Ok(RunResult { status: 0, output: String::from_utf8_lossy(&output.stderr).into_owned() });
+        tokio::fs::write(&path, &output.stdout)
+            .await
+            .map_err(|e| e.to_string())?;
+        return Ok(RunResult {
+            status: 0,
+            output: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
     }
     let mut text = String::from_utf8_lossy(&output.stderr).into_owned();
     if text.trim().is_empty() {
         text = String::from_utf8_lossy(&output.stdout[..output.stdout.len().min(300)]).into_owned();
     }
-    Ok(RunResult { status: output.status.code().unwrap_or(-1).max(1), output: text })
+    Ok(RunResult {
+        status: output.status.code().unwrap_or(-1).max(1),
+        output: text,
+    })
 }
 
 /// Streams output as batched `proc-lines` events and finishes with `proc-exit`.
@@ -117,7 +137,9 @@ pub async fn stream_tool(
     args: Vec<String>,
 ) -> Result<(), String> {
     let mut cmd = prepare(&toolchain, &tool).await?;
-    cmd.args(&args).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
 
     let (line_tx, mut line_rx) = mpsc::unbounded_channel::<String>();
@@ -130,7 +152,13 @@ pub async fn stream_tool(
     drop(line_tx);
 
     let (kill_tx, kill_rx) = oneshot::channel();
-    streams.0.lock().await.insert(id.clone(), StreamHandle { pid: child.id(), kill: Some(kill_tx) });
+    streams.0.lock().await.insert(
+        id.clone(),
+        StreamHandle {
+            pid: child.id(),
+            kill: Some(kill_tx),
+        },
+    );
 
     // Batch lines so a chatty logcat does not flood the webview with one event per line.
     let emit_app = app.clone();
@@ -157,7 +185,13 @@ pub async fn stream_tool(
             }
         }
         if !batch.is_empty() {
-            let _ = emit_app.emit("proc-lines", LinesEvent { id: emit_id, lines: batch });
+            let _ = emit_app.emit(
+                "proc-lines",
+                LinesEvent {
+                    id: emit_id,
+                    lines: batch,
+                },
+            );
         }
     });
 
@@ -199,15 +233,19 @@ async fn read_lines<R: AsyncRead + Unpin>(reader: R, tx: mpsc::UnboundedSender<S
 
 /// `interrupt` sends SIGINT on Unix so scrcpy/screenrecord can finalize their files; otherwise kills.
 #[tauri::command]
-pub async fn stop_stream(streams: State<'_, Streams>, id: String, interrupt: bool) -> Result<(), String> {
+pub async fn stop_stream(
+    streams: State<'_, Streams>,
+    id: String,
+    interrupt: bool,
+) -> Result<(), String> {
     let mut map = streams.0.lock().await;
-    let Some(handle) = map.get_mut(&id) else { return Ok(()) };
+    let Some(handle) = map.get_mut(&id) else {
+        return Ok(());
+    };
     #[cfg(unix)]
-    if interrupt {
-        if let Some(pid) = handle.pid {
-            unsafe { libc::kill(pid as i32, libc::SIGINT) };
-            return Ok(());
-        }
+    if interrupt && let Some(pid) = handle.pid {
+        unsafe { libc::kill(pid as i32, libc::SIGINT) };
+        return Ok(());
     }
     let _ = interrupt;
     if let Some(kill) = handle.kill.take() {
@@ -218,7 +256,7 @@ pub async fn stop_stream(streams: State<'_, Streams>, id: String, interrupt: boo
 
 pub async fn stop_all(streams: &Streams) {
     let mut map = streams.0.lock().await;
-    for (_, handle) in map.iter_mut() {
+    for handle in map.values_mut() {
         #[cfg(unix)]
         if let Some(pid) = handle.pid {
             unsafe { libc::kill(pid as i32, libc::SIGINT) };

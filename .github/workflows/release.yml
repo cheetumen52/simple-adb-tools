@@ -15,7 +15,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: ci
     strategy:
       fail-fast: false
       matrix:
@@ -53,6 +57,22 @@ jobs:
         working-directory: tauri
         run: npm ci
 
+      - name: Release notes from CHANGELOG.md
+        id: notes
+        shell: bash
+        run: |
+          version="v$(node -p "require('./tauri/package.json').version")"
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match app version $version"
+            exit 1
+          fi
+          py="$(command -v python3 || command -v python)"
+          {
+            echo "body<<NOTES_EOF"
+            "$py" scripts/release-notes.py "$version"
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,7 +86,10 @@ jobs:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: Simple ADB tools ${{ github.ref_name }}
           releaseBody: |
-            Instalace APK, logcat, zrcadlení obrazovky, Wi‑Fi ladění a další adb nástroje bez terminálu.
+            ${{ steps.notes.outputs.body }}
+
+            ---
+            Instalace APK, logcat, zrcadlení obrazovky, Wi‑Fi ladění a další adb nástroje bez terminálu. Nainstalovaná aplikace se příště aktualizuje sama.
 
             **Windows:** `*-setup.exe` (doporučeno) nebo `.msi`. Bez placeného certifikátu ukáže SmartScreen varování → Další informace → Přesto spustit.
             **macOS:** `_aarch64.dmg` pro Apple Silicon (M1 a novější), `_x64.dmg` pro Intel. Appka není notarizovaná → po prvním spuštění Nastavení → Soukromí a zabezpečení → Přesto otevřít.
@@ -92,6 +115,7 @@ jobs:
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Assemble and upload latest.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -122,7 +146,7 @@ jobs:
               raise SystemExit(f"Missing updater signatures for: {sorted(missing)}")
           manifest = {
               "version": tag.lstrip("v"),
-              "notes": f"Simple ADB tools {tag}",
+              "notes": os.popen(f"python3 scripts/release-notes.py {tag}").read().strip() or f"Simple ADB tools {tag}",
               "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "platforms": platforms,
           }

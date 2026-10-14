@@ -1,15 +1,10 @@
 import { create } from "zustand";
+
+export type { RecentApp } from "../lib/parse";
 import { native } from "../lib/native";
-import { displayName, packageList, sections, shQuote, type Device } from "../lib/parse";
+import { displayName, packageList, parseRecentApps, sections, shQuote, type Device, type RecentApp } from "../lib/parse";
 import { log } from "./log";
 import { readyDevices, targets, useInstaller } from "./installer";
-
-export interface RecentApp {
-  pkg: string;
-  versionName: string;
-  lastUpdate: number;
-  firstInstall: number;
-}
 
 export type RecentAction = "launch" | "restart" | "stop" | "settings" | "clearData" | "uninstall";
 
@@ -32,28 +27,6 @@ export function recentDevice(serial: string | null): Device | null {
   return ready.find((d) => d.serial === serial) ?? targets(s)[0] ?? ready[0] ?? null;
 }
 
-// dumpsys prints device-local "2026-10-14 12:39:05"; the phone and the computer normally share a timezone.
-const parseTime = (s: string | undefined) => (s ? new Date(s.replace(" ", "T")).getTime() || 0 : 0);
-
-function parseDump(dump: string, thirdParty: Set<string>): RecentApp[] {
-  const apps = new Map<string, RecentApp>();
-  let current: RecentApp | null = null;
-  for (const raw of dump.split("\n")) {
-    const line = raw.trim();
-    const pkg = line.match(/^Package \[([^\]]+)\]/)?.[1];
-    if (pkg) {
-      current = apps.has(pkg) || !thirdParty.has(pkg) ? null : { pkg, versionName: "?", lastUpdate: 0, firstInstall: 0 };
-      if (current) apps.set(pkg, current);
-      continue;
-    }
-    if (!current) continue;
-    if (line.startsWith("versionName=")) current.versionName = line.slice(12);
-    else if (line.startsWith("firstInstallTime=")) current.firstInstall = parseTime(line.slice(17));
-    else if (line.startsWith("lastUpdateTime=")) current.lastUpdate = parseTime(line.slice(15));
-  }
-  return [...apps.values()].sort((a, b) => b.lastUpdate - a.lastUpdate).slice(0, LIMIT);
-}
-
 export const useRecentApps = create<RecentAppsState>((set, get) => ({
   serial: null,
   apps: [],
@@ -73,7 +46,7 @@ export const useRecentApps = create<RecentAppsState>((set, get) => ({
       "echo @@third; pm list packages -3; echo @@dump; dumpsys package packages | grep -E 'Package \\[|versionName=|lastUpdateTime=|firstInstallTime='";
     const r = await native.run("adb", ["-s", device.serial, "shell", script], 30000);
     const s = sections(r.output);
-    set({ apps: parseDump(s.dump ?? "", new Set(packageList(s.third))), loading: false, loadedFor: device.serial });
+    set({ apps: parseRecentApps(s.dump ?? "", new Set(packageList(s.third)), LIMIT), loading: false, loadedFor: device.serial });
   },
 
   action: async (pkg, action) => {

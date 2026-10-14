@@ -137,3 +137,32 @@ export function czechUptime(raw: string): string {
   }
   return raw.includes(":") ? `${raw} h` : raw;
 }
+
+export interface RecentApp {
+  pkg: string;
+  versionName: string;
+  lastUpdate: number;
+  firstInstall: number;
+}
+
+// dumpsys prints device-local "2026-10-14 12:39:05"; the phone and the computer normally share a timezone.
+const parseTime = (s: string | undefined) => (s ? new Date(s.replace(" ", "T")).getTime() || 0 : 0);
+
+export function parseRecentApps(dump: string, thirdParty: Set<string>, limit = 10): RecentApp[] {
+  const apps = new Map<string, RecentApp>();
+  let current: RecentApp | null = null;
+  for (const raw of dump.split("\n")) {
+    const line = raw.trim();
+    const pkg = line.match(/^Package \[([^\]]+)\]/)?.[1];
+    if (pkg) {
+      current = apps.has(pkg) || !thirdParty.has(pkg) ? null : { pkg, versionName: "?", lastUpdate: 0, firstInstall: 0 };
+      if (current) apps.set(pkg, current);
+      continue;
+    }
+    if (!current) continue;
+    if (line.startsWith("versionName=")) current.versionName = line.slice(12);
+    else if (line.startsWith("firstInstallTime=")) current.firstInstall = parseTime(line.slice(17));
+    else if (line.startsWith("lastUpdateTime=")) current.lastUpdate = parseTime(line.slice(15));
+  }
+  return [...apps.values()].sort((a, b) => b.lastUpdate - a.lastUpdate).slice(0, limit);
+}

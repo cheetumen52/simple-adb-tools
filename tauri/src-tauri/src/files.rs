@@ -18,10 +18,14 @@ pub async fn list_apks(folders: Vec<String>, limit: usize) -> Vec<ApkEntry> {
     tokio::task::spawn_blocking(move || {
         let mut found = Vec::new();
         for folder in folders {
-            let Ok(entries) = std::fs::read_dir(&folder) else { continue };
+            let Ok(entries) = std::fs::read_dir(&folder) else {
+                continue;
+            };
             for entry in entries.flatten() {
                 let path = entry.path();
-                let is_apk = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("apk"));
+                let is_apk = path
+                    .extension()
+                    .is_some_and(|e| e.eq_ignore_ascii_case("apk"));
                 let Ok(meta) = entry.metadata() else { continue };
                 if !is_apk || !meta.is_file() {
                     continue;
@@ -62,7 +66,9 @@ pub fn system_paths(app: AppHandle) -> Result<Paths, String> {
     let path = app.path();
     let home = path.home_dir().map_err(|e| e.to_string())?;
     let desktop = path.desktop_dir().unwrap_or_else(|_| home.join("Desktop"));
-    let downloads = path.download_dir().unwrap_or_else(|_| home.join("Downloads"));
+    let downloads = path
+        .download_dir()
+        .unwrap_or_else(|_| home.join("Downloads"));
     let platform = if cfg!(target_os = "macos") {
         "macos"
     } else if cfg!(windows) {
@@ -80,12 +86,16 @@ pub fn system_paths(app: AppHandle) -> Result<Paths, String> {
 
 #[tauri::command]
 pub async fn write_text(path: String, contents: String) -> Result<(), String> {
-    tokio::fs::write(path, contents).await.map_err(|e| e.to_string())
+    tokio::fs::write(path, contents)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn make_dir(path: String) -> Result<(), String> {
-    tokio::fs::create_dir_all(path).await.map_err(|e| e.to_string())
+    tokio::fs::create_dir_all(path)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
