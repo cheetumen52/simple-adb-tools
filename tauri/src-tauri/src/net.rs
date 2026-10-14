@@ -40,7 +40,7 @@ mod tests {
             "reachable"
         );
 
-        // Bind and drop to get a port that is almost certainly closed.
+        // Bind and drop to get a closed port. Windows retries SYN before reporting the refusal (~2 s).
         let closed = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .unwrap()
@@ -48,7 +48,7 @@ mod tests {
             .unwrap()
             .port();
         assert_eq!(
-            probe_tcp("127.0.0.1".into(), closed, Some(2000)).await,
+            probe_tcp("127.0.0.1".into(), closed, Some(6000)).await,
             "refused"
         );
     }
