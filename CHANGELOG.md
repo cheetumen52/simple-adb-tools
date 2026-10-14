@@ -1,15 +1,17 @@
 # Changelog
 
-Všechny podstatné změny Simple ADB tools. Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/), verze se řídí [sémantickým verzováním](https://semver.org/lang/cs/).
+Všechny podstatné změny Simple ADB tools. Anglická verze je v [CHANGELOG.en.md](CHANGELOG.en.md). Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/), verze se řídí [sémantickým verzováním](https://semver.org/lang/cs/).
 
 ## [Nevydáno]
 
 ### Přidáno
 - Automatické aktualizace: aplikace sama stáhne novou verzi, ověří její podpis a po kliknutí na „Aktualizovat a restartovat“ ji nainstaluje.
 - Sekce „Poslední APK v zařízení“: 10 naposledy nainstalovaných nebo aktualizovaných aplikací přímo ze zařízení, s přepínačem zařízení a rychlými akcemi.
-- Changelog přímo v aplikaci (Support → Co je nového) a poznámky k dostupné aktualizaci.
+- Changelog přímo v aplikaci (Nastavení → Co je nového) a poznámky k dostupné aktualizaci.
+- Angličtina: aplikace se řídí jazykem systému a jazyk jde přepnout v Nastavení. Instalátor, chybové hlášky i changelog jsou v obou jazycích.
 
 ### Změněno
+- Záložka Support se jmenuje Nastavení a kromě podpory obsahuje volbu jazyka, aktualizace a changelog.
 - „Poslední APK“ se jmenuje „Nalezené APK ve složce“ a sekce poslední nainstalované aplikace je nad ním.
 - F5 a tlačítko „Obnovit“ při obnově zařízení roztočí ikonu, aby bylo vidět, že se něco děje.
 

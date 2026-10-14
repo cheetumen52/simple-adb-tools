@@ -2,37 +2,24 @@ import { create } from "zustand";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { baseName, joinPath, native, streamTool } from "../lib/native";
-import { czechUptime, displayName, isWireless, logcatLevel, packageList, sections, shQuote, type Device } from "../lib/parse";
+import { displayName, isWireless, logcatLevel, packageList, sections, shQuote, type Device } from "../lib/parse";
 import { fileStamp } from "../lib/format";
 import { load, save } from "../lib/storage";
 import { log } from "./log";
 import { useApp } from "./app";
 import { readyDevices, useInstaller } from "./installer";
 import { useWireless } from "./wireless";
+import { tr } from "../i18n";
 
 export type ToolsetSection = "overview" | "mirror" | "apps" | "logcat" | "control" | "wireless" | "developer" | "shell";
 
-export const SECTIONS: { id: ToolsetSection; title: string }[] = [
-  { id: "overview", title: "Přehled" },
-  { id: "mirror", title: "Zrcadlení" },
-  { id: "apps", title: "Aplikace" },
-  { id: "logcat", title: "Logcat" },
-  { id: "control", title: "Ovládání" },
-  { id: "wireless", title: "Wi‑Fi" },
-  { id: "developer", title: "Vývojář" },
-  { id: "shell", title: "Shell" },
-];
+/** Labels live in the translations under `toolset.sections`. */
+export const SECTIONS: ToolsetSection[] = ["overview", "mirror", "apps", "logcat", "control", "wireless", "developer", "shell"];
 
 export type DevToggle = "showTouches" | "pointerLocation" | "animationsOff" | "darkMode" | "stayAwake" | "layoutBounds";
 
-export const DEV_TOGGLES: { id: DevToggle; title: string; help: string }[] = [
-  { id: "showTouches", title: "Zobrazovat dotyky", help: "Kolečko v místě každého dotyku. Ideální pro nahrávání videí a demo." },
-  { id: "pointerLocation", title: "Poloha ukazatele", help: "Souřadnice dotyku a stopa pohybu v horní liště." },
-  { id: "animationsOff", title: "Vypnout animace", help: "Nastaví všechna měřítka animací na 0. Rychlejší UI testy, méně flaky." },
-  { id: "darkMode", title: "Tmavý režim", help: "Přepne systémový tmavý vzhled. Rychlý test dark mode." },
-  { id: "stayAwake", title: "Nezhasínat při nabíjení", help: "Displej nezhasne, dokud je telefon na kabelu." },
-  { id: "layoutBounds", title: "Hranice layoutu", help: "Vykreslí okraje a marginy všech view. Projeví se po přepnutí aplikace." },
-];
+/** Labels live in the translations under `toolset.developer.toggles`. */
+export const DEV_TOGGLES: DevToggle[] = ["showTouches", "pointerLocation", "animationsOff", "darkMode", "stayAwake", "layoutBounds"];
 
 export type LogLevel = "V" | "D" | "I" | "W" | "E";
 export const LOG_LEVELS: [LogLevel, string][] = [["V", "Verbose"], ["D", "Debug"], ["I", "Info"], ["W", "Warning"], ["E", "Error"]];
@@ -90,6 +77,8 @@ interface ToolsetState {
   setSection: (section: ToolsetSection) => void;
   deviceChanged: () => void;
   reload: () => void;
+  /** Re-reads device info whose labels and values were rendered in the previous language. */
+  relocalize: () => void;
   loadInfo: () => Promise<void>;
   reboot: (mode: string | null) => Promise<void>;
   push: (paths: string[]) => Promise<void>;
@@ -180,10 +169,10 @@ async function finishRecording() {
   const r = await native.run("adb", ["-s", serial, "pull", REMOTE_RECORDING, local], 120000);
   await native.run("adb", ["-s", serial, "shell", "rm", "-f", REMOTE_RECORDING], 15000);
   if (r.status === 0) {
-    log("success", `✓ Video uloženo na plochu: ${name}`);
+    log("success", tr().toolset.logs.videoSaved(name));
     void openPath(local);
   } else {
-    log("error", `Video se nepodařilo stáhnout: ${r.output.trim()}`);
+    log("error", tr().toolset.logs.videoFailed(r.output.trim()));
   }
 }
 
@@ -239,6 +228,12 @@ export const useToolset = create<ToolsetState>((set) => ({
     if (s.section === "developer") void s.loadToggles();
   },
 
+  relocalize: () => {
+    const s = get();
+    if (s.info.length) void s.loadInfo();
+    if (s.selectedPackage) void s.selectPackage(s.selectedPackage);
+  },
+
   loadInfo: async () => {
     const d = device();
     if (!d) return;
@@ -266,7 +261,8 @@ export const useToolset = create<ToolsetState>((set) => ({
         .find((l) => l.trim().startsWith(`${field}:`))
         ?.split(":")[1]
         ?.trim();
-    const statusMap: Record<string, string> = { "1": "neznámý", "2": "nabíjí se", "3": "vybíjí se", "4": "nenabíjí", "5": "nabito" };
+    const m = tr().toolset.info;
+    const statusMap = m.batteryStatus;
     let batteryText = "–";
     const level = battery("level");
     if (level) {
@@ -277,24 +273,24 @@ export const useToolset = create<ToolsetState>((set) => ({
       if (!Number.isNaN(t)) batteryText += ` · ${(t / 10).toFixed(1)} °C`;
     }
     const storage = last("storage").split(/\s+/);
-    const ip = s.ip?.match(/inet (\d+\.\d+\.\d+\.\d+)/)?.[1] ?? "nepřipojeno k Wi‑Fi";
+    const ip = s.ip?.match(/inet (\d+\.\d+\.\d+\.\d+)/)?.[1] ?? m.noWifi;
     const uptime = s.uptime?.match(/up ([^,]+)/)?.[1];
     const manufacturer = last("manufacturer");
     set({
       loadingInfo: false,
       info: [
-        { label: "Výrobce", value: manufacturer.charAt(0).toUpperCase() + manufacturer.slice(1).toLowerCase() },
-        { label: "Model", value: last("model") },
-        { label: "Android", value: `${last("release")} (API ${last("sdk")})` },
-        { label: "Procesor (ABI)", value: last("abi") },
-        { label: "Build", value: last("build") },
-        { label: "Rozlišení", value: afterColon("size") },
-        { label: "Hustota", value: `${afterColon("density")} dpi` },
-        { label: "Baterie", value: batteryText },
-        { label: "Úložiště", value: storage.length >= 4 ? `volno ${storage[3]} z ${storage[1]}` : "–" },
-        { label: "IP adresa", value: ip },
-        { label: "Zapnuto", value: uptime ? czechUptime(uptime) : "–" },
-        { label: "Sériové číslo", value: d.serial },
+        { label: m.manufacturer, value: manufacturer.charAt(0).toUpperCase() + manufacturer.slice(1).toLowerCase() },
+        { label: m.model, value: last("model") },
+        { label: m.android, value: `${last("release")} (API ${last("sdk")})` },
+        { label: m.abi, value: last("abi") },
+        { label: m.build, value: last("build") },
+        { label: m.resolution, value: afterColon("size") },
+        { label: m.density, value: `${afterColon("density")} dpi` },
+        { label: m.battery, value: batteryText },
+        { label: m.storage, value: storage.length >= 4 ? m.storageFree(storage[3], storage[1]) : "–" },
+        { label: m.ip, value: ip },
+        { label: m.uptime, value: uptime ? tr().format.uptime(uptime) : "–" },
+        { label: m.serial, value: d.serial },
       ],
     });
   },
@@ -309,7 +305,7 @@ export const useToolset = create<ToolsetState>((set) => ({
     if (!d) return;
     for (const p of paths) {
       const r = await adbLogged(["push", p, "/sdcard/Download/"], d, 600000);
-      log(r.status === 0 ? "success" : "error", r.status === 0 ? `✓ ${baseName(p)} je v telefonu ve složce Download` : `✗ ${baseName(p)} se nepodařilo nahrát`);
+      log(r.status === 0 ? "success" : "error", r.status === 0 ? tr().toolset.logs.pushed(baseName(p)) : tr().toolset.logs.pushFailed(baseName(p)));
     }
   },
 
@@ -339,21 +335,22 @@ export const useToolset = create<ToolsetState>((set) => ({
     const out = (await shell(d, `dumpsys package ${shQuote(pkg)}`)).output;
     const value = (key: string) => out.match(new RegExp(`${key}=([^\\n]+)`))?.[1]?.trim() ?? "?";
     if (get().selectedPackage !== pkg) return;
+    const m = tr().toolset.info;
     set({
       packageDetails: [
-        { label: "Verze", value: `${value("versionName")} (${value("versionCode").split(" ")[0]})` },
-        { label: "Target SDK", value: value("targetSdk").split(" ")[0] },
-        { label: "Nainstalováno", value: value("firstInstallTime") },
-        { label: "Aktualizováno", value: value("lastUpdateTime") },
+        { label: m.version, value: `${value("versionName")} (${value("versionCode").split(" ")[0]})` },
+        { label: m.targetSdk, value: value("targetSdk").split(" ")[0] },
+        { label: m.installed, value: value("firstInstallTime") },
+        { label: m.updated, value: value("lastUpdateTime") },
       ],
     });
   },
 
-  launch: (pkg) => runOnDevice(`Spouštím ${pkg}`, `monkey -p ${shQuote(pkg)} -c android.intent.category.LAUNCHER 1`),
-  forceStop: (pkg) => runOnDevice(`Zastavuji ${pkg}`, `am force-stop ${shQuote(pkg)}`),
-  clearData: (pkg) => runOnDevice(`Mažu data ${pkg}`, `pm clear ${shQuote(pkg)}`),
+  launch: (pkg) => runOnDevice(`${tr().actions.launch} ${pkg}`, `monkey -p ${shQuote(pkg)} -c android.intent.category.LAUNCHER 1`),
+  forceStop: (pkg) => runOnDevice(`${tr().actions.stop} ${pkg}`, `am force-stop ${shQuote(pkg)}`),
+  clearData: (pkg) => runOnDevice(`${tr().actions.clearData} ${pkg}`, `pm clear ${shQuote(pkg)}`),
   openSettings: (pkg) =>
-    runOnDevice(`Otevírám nastavení ${pkg}`, `am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d ${shQuote(`package:${pkg}`)}`),
+    runOnDevice(`${tr().actions.settings} ${pkg}`, `am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d ${shQuote(`package:${pkg}`)}`),
 
   uninstall: async (pkg) => {
     const d = device();
@@ -375,7 +372,7 @@ export const useToolset = create<ToolsetState>((set) => ({
       selectedPackage: get().selectedPackage === pkg ? null : get().selectedPackage,
       removedSystemPackages: system ? [...get().removedSystemPackages, pkg].sort() : get().removedSystemPackages,
     });
-    if (system) log("success", `✓ Systémová aplikace ${pkg} odebrána. Vrátit ji jde přes „Obnovit odebrané“.`);
+    if (system) log("success", tr().toolset.logs.systemRemoved(pkg));
   },
 
   restoreSystemPackage: async (pkg) => {
@@ -384,7 +381,7 @@ export const useToolset = create<ToolsetState>((set) => ({
     log("command", `cmd package install-existing ${pkg} → ${displayName(d)}`);
     const r = await shell(d, `cmd package install-existing ${shQuote(pkg)}`);
     const ok = r.status === 0 && !r.output.toLowerCase().includes("fail");
-    log(ok ? "success" : "error", ok ? `✓ ${pkg} je zpět` : `Obnovení ${pkg} selhalo: ${r.output.trim()}`);
+    log(ok ? "success" : "error", ok ? tr().toolset.logs.restored(pkg) : tr().toolset.logs.restoreFailed(pkg, r.output.trim()));
     await get().loadPackages();
   },
 
@@ -394,7 +391,7 @@ export const useToolset = create<ToolsetState>((set) => ({
     if (!d || !downloads) return;
     const remote = packageList((await shell(d, `pm path ${shQuote(pkg)}`)).output);
     if (!remote.length) {
-      log("error", `Cestu k APK pro ${pkg} se nepodařilo zjistit`);
+      log("error", tr().toolset.logs.apkPathUnknown(pkg));
       return;
     }
     let target = joinPath(downloads, `${pkg}.apk`);
@@ -408,12 +405,12 @@ export const useToolset = create<ToolsetState>((set) => ({
       ok = (await adbLogged(["pull", path, local], d, 600000)).status === 0 && ok;
     }
     if (ok) {
-      log("success", `✓ APK uloženo: ${target}${remote.length > 1 ? ` (split APK, ${remote.length} souborů)` : ""}`);
+      log("success", tr().toolset.logs.apkSaved(target, remote.length));
       void revealItemInDir(target);
     }
   },
 
-  showCurrentActivity: () => runOnDevice("Aktuální aktivita", "dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | head -2"),
+  showCurrentActivity: () => runOnDevice(tr().toolset.logs.currentActivity, "dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | head -2"),
 
   startLogcat: async () => {
     const d = device();
@@ -423,7 +420,7 @@ export const useToolset = create<ToolsetState>((set) => ({
     if (pkg) {
       const pid = (await shell(d, `pidof ${shQuote(pkg)}`)).output.trim().split(" ")[0];
       if (!pid || Number.isNaN(Number(pid))) {
-        log("error", `${pkg} neběží. Spusť aplikaci a zkus to znovu.`);
+        log("error", tr().toolset.logs.notRunning(pkg));
         return;
       }
       args.push(`--pid=${pid}`);
@@ -444,7 +441,7 @@ export const useToolset = create<ToolsetState>((set) => ({
       set({ logcatRunning: true });
       logcatTimer = window.setInterval(drainLogcat, 250);
     } catch (e) {
-      log("error", `Logcat nejde spustit: ${String(e)}`);
+      log("error", tr().toolset.logs.logcatFailed(String(e)));
     }
   },
 
@@ -486,48 +483,48 @@ export const useToolset = create<ToolsetState>((set) => ({
       set({ recordingSince: Date.now() });
       log("command", `adb shell screenrecord → ${displayName(d)} (max. 3 min)`);
     } catch (e) {
-      log("error", `Nahrávání nejde spustit: ${String(e)}`);
+      log("error", tr().toolset.logs.recordingFailed(String(e)));
     }
   },
 
-  key: (code, label) => runOnDevice(`Klávesa ${label}`, `input keyevent ${code}`),
+  key: (code, label) => runOnDevice(tr().toolset.logs.key(label), `input keyevent ${code}`),
 
   sendText: () => {
     const text = get().typeText;
     if (!text) return;
-    runOnDevice("Píšu text", `input text ${shQuote(text.replaceAll(" ", "%s"))}`);
+    runOnDevice(tr().toolset.logs.typing, `input text ${shQuote(text.replaceAll(" ", "%s"))}`);
     set({ typeText: "" });
   },
 
   openDeepLink: (link) => {
     const url = (link ?? get().deepLink).trim();
     if (!url) return;
-    runOnDevice(`Otevírám ${url}`, `am start -W -a android.intent.action.VIEW -d ${shQuote(url)}`);
+    runOnDevice(tr().toolset.logs.opening(url), `am start -W -a android.intent.action.VIEW -d ${shQuote(url)}`);
     const history = [url, ...get().deepLinkHistory.filter((h) => h !== url)].slice(0, 8);
     set({ deepLinkHistory: history });
     save("deepLinkHistory", history);
   },
 
-  openDeveloperOptions: () => runOnDevice("Možnosti pro vývojáře", "am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS"),
+  openDeveloperOptions: () => runOnDevice(tr().toolset.logs.developerOptions, "am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS"),
 
   switchToWifi: async () => {
     const d = device();
     if (!d) return;
     const ip = (await shell(d, "ip -f inet addr show wlan0")).output.match(/inet (\d+\.\d+\.\d+\.\d+)/)?.[1];
     if (!ip) {
-      log("error", "Telefon není připojený k Wi‑Fi.");
+      log("error", tr().toolset.logs.noWifi);
       return;
     }
     await adbLogged(["tcpip", "5555"], d);
     await new Promise((r) => setTimeout(r, 2000));
-    if (await useWireless.getState().connect(`${ip}:5555`)) log("success", `✓ Připojeno přes Wi‑Fi (${ip}:5555). Kabel můžeš odpojit.`);
+    if (await useWireless.getState().connect(`${ip}:5555`)) log("success", tr().toolset.logs.switchedToWifi(`${ip}:5555`));
     void useInstaller.getState().refreshDevices();
   },
 
   connect: async () => {
     const host = get().connectHost.trim();
     if (!host) return;
-    if (await useWireless.getState().connect(host.includes(":") ? host : `${host}:5555`)) log("success", "✓ Připojeno přes Wi‑Fi");
+    if (await useWireless.getState().connect(host.includes(":") ? host : `${host}:5555`)) log("success", tr().toolset.logs.connected);
     void useInstaller.getState().refreshDevices();
   },
 
@@ -542,7 +539,7 @@ export const useToolset = create<ToolsetState>((set) => ({
     }
     if (!r.output.toLowerCase().includes("success")) return;
     set({ pairCode: "" });
-    log("success", "✓ Spárováno, hledám telefon v síti…");
+    log("success", tr().toolset.logs.paired);
     // The connect port differs from the pairing port; mDNS advertises it shortly after pairing.
     for (let i = 0; i < 5; i++) {
       await new Promise((res) => setTimeout(res, 1500));
@@ -555,7 +552,7 @@ export const useToolset = create<ToolsetState>((set) => ({
         return;
       }
     }
-    log("info", "Telefon se v síti neohlásil. Připoj se ručně přes IP adresu a port z obrazovky Bezdrátové ladění.");
+    log("info", tr().toolset.logs.pairNotFound);
   },
 
   disconnectAll: async () => {
@@ -603,8 +600,8 @@ export const useToolset = create<ToolsetState>((set) => ({
       stayAwake: `svc power stayon ${on ? "true" : "false"}`,
       layoutBounds: `setprop debug.layout ${on ? "true" : "false"}; service call activity 1599295570 > /dev/null`,
     };
-    const title = DEV_TOGGLES.find((t) => t.id === toggle)!.title;
-    log("command", `${title}: ${on ? "zapnuto" : "vypnuto"} → ${displayName(d)}`);
+    const m = tr().toolset.developer;
+    log("command", `${m.toggles[toggle].title}: ${on ? m.on : m.off} → ${displayName(d)}`);
     const r = await shell(d, commands[toggle]);
     if (r.status !== 0) log("error", r.output.trim());
     await get().loadToggles();

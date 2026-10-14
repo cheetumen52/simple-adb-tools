@@ -14,6 +14,7 @@ import { MIRROR_SIZES, MIRROR_SOURCES, useMirror, type MirrorSource } from "../s
 import { useDrag } from "../state/drag";
 import { Button, Card, CardTitle, ConfirmDialog, Elapsed, Kicker, Menu, Pill, Progress, SectionHeader, Spinner, Switch, TextField, type ConfirmRequest } from "../components/ui";
 import { LogPanel } from "../components/LogPanel";
+import { useT, type Messages } from "../i18n";
 
 const ICONS: Record<ToolsetSection, typeof Info> = {
   overview: Info, mirror: MonitorSmartphone, apps: LayoutGrid, logcat: AlignLeft, control: Hand, wireless: Wifi, developer: Hammer, shell: Terminal,
@@ -43,16 +44,17 @@ function DevicePicker() {
 function SectionNav() {
   const { section, setSection, logcatRunning } = useToolset();
   const mirroring = useMirror((s) => Object.keys(s.running).length > 0);
+  const t = useT();
   return (
     <nav className="subnav" style={{ alignSelf: "flex-start", flexWrap: "wrap" }}>
-      {SECTIONS.map((s) => {
-        const Icon = ICONS[s.id];
+      {SECTIONS.map((id) => {
+        const Icon = ICONS[id];
         return (
-          <button key={s.id} className={`subtab${section === s.id ? " active" : ""}`} onClick={() => setSection(s.id)}>
+          <button key={id} className={`subtab${section === id ? " active" : ""}`} onClick={() => setSection(id)}>
             <Icon size={12} />
-            {s.title}
-            {s.id === "logcat" && logcatRunning && <span className="dot" style={{ background: "var(--danger)", width: 5, height: 5 }} />}
-            {s.id === "mirror" && mirroring && <span className="dot" style={{ background: "var(--light-cyan)", width: 5, height: 5 }} />}
+            {t.toolset.sections[id]}
+            {id === "logcat" && logcatRunning && <span className="dot" style={{ background: "var(--danger)", width: 5, height: 5 }} />}
+            {id === "mirror" && mirroring && <span className="dot" style={{ background: "var(--light-cyan)", width: 5, height: 5 }} />}
           </button>
         );
       })}
@@ -80,11 +82,13 @@ function OverviewSection() {
   const device = useDevice();
   const over = useDrag((s) => s.over) === "push";
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const t = useT();
+  const m = t.toolset.overview;
   const askReboot = (mode: string | null) =>
     setConfirm({
-      title: `Restartovat ${device ? displayName(device) : "telefon"}${mode ? ` do režimu ${mode}` : ""}?`,
-      message: "Telefon se na chvíli odpojí.",
-      confirm: "Restartovat",
+      title: m.rebootTitle(device ? displayName(device) : t.common.phone, mode),
+      message: m.rebootMessage,
+      confirm: t.common.restart,
       action: () => void reboot(mode),
     });
   return (
@@ -92,10 +96,10 @@ function OverviewSection() {
       <Card>
         <div className="stack" style={{ gap: 12 }}>
           <div className="row">
-            <CardTitle kicker="zařízení" title={device ? displayName(device) : ""} />
+            <CardTitle kicker={m.deviceKicker} title={device ? displayName(device) : ""} />
             <div className="spacer" />
             {loadingInfo && <Spinner />}
-            <Button small icon={<RefreshCw size={13} />} onClick={() => void loadInfo()}>Obnovit</Button>
+            <Button small icon={<RefreshCw size={13} />} onClick={() => void loadInfo()}>{t.common.refresh}</Button>
           </div>
           <InfoGrid rows={info} />
         </div>
@@ -103,17 +107,17 @@ function OverviewSection() {
       <div className="grid-2">
         <Card>
           <div className="stack" style={{ gap: 10 }}>
-            <CardTitle kicker="soubory" title="Poslat do telefonu" subtitle="Pusť sem soubory, skončí v telefonu ve složce Download." />
+            <CardTitle kicker={m.filesKicker} title={m.pushTitle} subtitle={m.pushSubtitle} />
             <div className={`dropzone${over ? " active" : ""}`} style={{ height: 64 }} data-drop="push">
-              <span className="row caption secondary"><ArrowUpFromLine size={14} /> Přetáhni soubory</span>
+              <span className="row caption secondary"><ArrowUpFromLine size={14} /> {m.pushDrop}</span>
             </div>
           </div>
         </Card>
         <Card>
           <div className="stack" style={{ gap: 10 }}>
-            <CardTitle kicker="napájení" title="Restart" subtitle="Běžný restart nebo režim pro flashování." />
+            <CardTitle kicker={m.powerKicker} title={m.rebootCard} subtitle={m.rebootSubtitle} />
             <div className="row">
-              <Button small onClick={() => askReboot(null)}>Restartovat</Button>
+              <Button small onClick={() => askReboot(null)}>{t.common.restart}</Button>
               <Button small onClick={() => askReboot("recovery")}>Recovery</Button>
               <Button small onClick={() => askReboot("bootloader")}>Bootloader</Button>
             </div>
@@ -127,9 +131,12 @@ function OverviewSection() {
 
 /* ---------- Mirror ---------- */
 
-const SHORTCUTS: [string, string][] = [
-  ["⌘/Alt F", "celá obrazovka"], ["⌘/Alt H", "Domů"], ["⌘/Alt B", "Zpět"], ["⌘/Alt S", "přepínač aplikací"], ["⌘/Alt P", "power"],
-  ["⌘/Alt O", "zhasnout displej"], ["⌘/Alt N", "notifikace"], ["⌘/Alt R", "otočit"], ["⌘/Alt C · V", "schránka"], ["APK do okna", "nainstaluje ho"],
+type ShortcutLabel = keyof Messages["toolset"]["mirror"]["shortcuts"];
+
+/** `null` key = the label itself names the gesture ("APK into window"). */
+const SHORTCUTS: [string | null, ShortcutLabel][] = [
+  ["⌘/Alt F", "fullscreen"], ["⌘/Alt H", "home"], ["⌘/Alt B", "back"], ["⌘/Alt S", "switcher"], ["⌘/Alt P", "power"],
+  ["⌘/Alt O", "screenOff"], ["⌘/Alt N", "notifications"], ["⌘/Alt R", "rotate"], ["⌘/Alt C · V", "clipboard"], [null, "apkInstalls"],
 ];
 
 function MirrorSection() {
@@ -137,17 +144,19 @@ function MirrorSection() {
   const mirror = useMirror();
   const tc = useToolchain();
   const setTab = useApp((s) => s.setTab);
+  const t = useT();
+  const m = t.toolset.mirror;
   if (tc.scrcpy.kind !== "found") {
     return (
       <Card highlight>
         <div className="stack" style={{ gap: 12 }}>
-          <CardTitle kicker="zrcadlení" title="Na zrcadlení potřebuju scrcpy" subtitle="Open-source nástroj, který obrazovku telefonu zobrazí na počítači s minimálním zpožděním. Stáhnu ho z oficiálního GitHubu a ověřím kontrolní součet." />
+          <CardTitle kicker={m.kicker} title={m.needsScrcpyTitle} subtitle={m.needsScrcpySubtitle} />
           {tc.installing === "scrcpy" ? (
             <div className="row" style={{ gap: 10 }}><Progress value={tc.progress} /><span className="mono-sm c-muted">{Math.round(tc.progress * 100)} %</span></div>
           ) : (
             <div className="row">
-              <Button variant="primary" small disabled={!!tc.installing} onClick={() => void tc.install("scrcpy")}>Stáhnout scrcpy (13 MB)</Button>
-              <Button small onClick={() => setTab("requirements")}>Systémové požadavky →</Button>
+              <Button variant="primary" small disabled={!!tc.installing} onClick={() => void tc.install("scrcpy")}>{m.downloadScrcpy}</Button>
+              <Button small onClick={() => setTab("requirements")}>{t.common.toRequirements}</Button>
             </div>
           )}
           {tc.error && <span className="caption c-danger">{tc.error}</span>}
@@ -165,64 +174,64 @@ function MirrorSection() {
         <div className="row" style={{ gap: 16 }}>
           <MonitorSmartphone size={26} color="var(--accent)" />
           <div className="stack" style={{ gap: 4, flex: 1 }}>
-            <Kicker color={since ? "var(--light-cyan)" : "var(--text-muted)"}>{since ? "běží" : "zrcadlení"}</Kicker>
-            <span style={{ fontSize: 15, fontWeight: 600 }}>{displayName(device)} na počítači</span>
-            <span className="caption">Otevře se samostatné okno. Ovládáš ho myší a klávesnicí, zavřením zrcadlení ukončíš.</span>
+            <Kicker color={since ? "var(--light-cyan)" : "var(--text-muted)"}>{since ? m.running : m.kicker}</Kicker>
+            <span style={{ fontSize: 15, fontWeight: 600 }}>{m.onComputer(displayName(device))}</span>
+            <span className="caption">{m.windowHint}</span>
           </div>
           {since ? (
             <>
               <Elapsed since={since} className="mono c-cyan" />
-              <Button variant="primary" icon={<Square size={13} />} onClick={() => mirror.stop(device)}>Ukončit</Button>
+              <Button variant="primary" icon={<Square size={13} />} onClick={() => mirror.stop(device)}>{m.stop}</Button>
             </>
           ) : (
-            <Button variant="primary" icon={<Play size={13} />} onClick={() => void mirror.start(device)}>Spustit zrcadlení</Button>
+            <Button variant="primary" icon={<Play size={13} />} onClick={() => void mirror.start(device)}>{m.start}</Button>
           )}
         </div>
       </Card>
       <Card>
         <div className="stack" style={{ gap: 14 }}>
           <div className="row top">
-            <CardTitle kicker="nastavení" title="Jak zrcadlit" subtitle="Projeví se při dalším spuštění." />
+            <CardTitle kicker={m.settingsKicker} title={m.settingsTitle} subtitle={m.settingsSubtitle} />
             <div className="spacer" />
-            {!!since && <Pill color="var(--warn)" dot={false}>běží – změny až po restartu</Pill>}
+            {!!since && <Pill color="var(--warn)" dot={false}>{m.restartNeeded}</Pill>}
           </div>
           <div className="row" style={{ gap: 24 }}>
             <div className="stack">
-              <Kicker muted>zdroj</Kicker>
+              <Kicker muted>{m.source}</Kicker>
               <div className="subnav">
-                {MIRROR_SOURCES.map(([id, title]) => (
-                  <button key={id} className={`subtab${o.source === id ? " active" : ""}`} onClick={() => mirror.setOption("source", id as MirrorSource)}>{title}</button>
+                {MIRROR_SOURCES.map((id) => (
+                  <button key={id} className={`subtab${o.source === id ? " active" : ""}`} onClick={() => mirror.setOption("source", id as MirrorSource)}>{m.sources[id]}</button>
                 ))}
               </div>
             </div>
             <div className="stack">
-              <Kicker muted>max. rozlišení</Kicker>
+              <Kicker muted>{m.maxSize}</Kicker>
               <select className="field" style={{ width: 130 }} value={o.maxSize} onChange={(e) => mirror.setOption("maxSize", Number(e.target.value))}>
-                {MIRROR_SIZES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                {MIRROR_SIZES.map((v) => <option key={v} value={v}>{v ? `${v} px` : m.sizeFull}</option>)}
               </select>
             </div>
           </div>
-          {!screen && <span className="caption c-warn">Kamera funguje od Androidu 12. Ovládání je v tomhle režimu vypnuté.</span>}
+          {!screen && <span className="caption c-warn">{m.cameraHint}</span>}
           <div className="grid-2" style={{ gap: 12 }}>
-            <Switch label="Přenášet zvuk (Android 11+)" checked={o.audio} onChange={(v) => mirror.setOption("audio", v)} />
-            <Switch label="Nahrávat na plochu" checked={o.record} onChange={(v) => mirror.setOption("record", v)} />
-            <Switch label="Zhasnout displej telefonu" checked={o.turnScreenOff} disabled={!screen || o.viewOnly} onChange={(v) => mirror.setOption("turnScreenOff", v)} />
-            <Switch label="Nezhasínat telefon" checked={o.stayAwake} disabled={!screen || o.viewOnly} onChange={(v) => mirror.setOption("stayAwake", v)} />
-            <Switch label="Zobrazovat dotyky" checked={o.showTouches} disabled={!screen} onChange={(v) => mirror.setOption("showTouches", v)} />
-            <Switch label="Okno vždy navrchu" checked={o.alwaysOnTop} onChange={(v) => mirror.setOption("alwaysOnTop", v)} />
-            <Switch label="Jen sledovat (bez ovládání)" checked={o.viewOnly} disabled={!screen} onChange={(v) => mirror.setOption("viewOnly", v)} />
+            <Switch label={m.audio} checked={o.audio} onChange={(v) => mirror.setOption("audio", v)} />
+            <Switch label={m.record} checked={o.record} onChange={(v) => mirror.setOption("record", v)} />
+            <Switch label={m.turnScreenOff} checked={o.turnScreenOff} disabled={!screen || o.viewOnly} onChange={(v) => mirror.setOption("turnScreenOff", v)} />
+            <Switch label={m.stayAwake} checked={o.stayAwake} disabled={!screen || o.viewOnly} onChange={(v) => mirror.setOption("stayAwake", v)} />
+            <Switch label={m.showTouches} checked={o.showTouches} disabled={!screen} onChange={(v) => mirror.setOption("showTouches", v)} />
+            <Switch label={m.alwaysOnTop} checked={o.alwaysOnTop} onChange={(v) => mirror.setOption("alwaysOnTop", v)} />
+            <Switch label={m.viewOnly} checked={o.viewOnly} disabled={!screen} onChange={(v) => mirror.setOption("viewOnly", v)} />
           </div>
         </div>
       </Card>
       <Card>
         <div className="stack" style={{ gap: 10 }}>
-          <CardTitle kicker="zkratky v okně zrcadlení" title="Ovládání z klávesnice" />
+          <CardTitle kicker={m.shortcutsKicker} title={m.shortcutsTitle} />
           <div className="grid-2" style={{ gap: 8 }}>
             {SHORTCUTS.map(([k, label]) => (
-              <div key={k} className="row" style={{ gap: 10 }}><span className="kbd">{k}</span><span className="caption secondary">{label}</span></div>
+              <div key={label} className="row" style={{ gap: 10 }}><span className="kbd">{k ?? m.shortcuts.apkDrop}</span><span className="caption secondary">{m.shortcuts[label]}</span></div>
             ))}
           </div>
-          <span className="caption">Pravé tlačítko myši = Zpět, prostřední = Domů. Na macOS se zkratky mačkají s ⌘, na Windows s levým Alt.</span>
+          <span className="caption">{m.mouseHint}</span>
         </div>
       </Card>
     </div>
@@ -240,15 +249,17 @@ function AppsSection() {
   }, [t.packages, t.packageQuery]);
   const pkg = t.selectedPackage;
   const system = pkg ? t.systemPackages.includes(pkg) : false;
+  const m = useT();
+  const a = m.toolset.apps;
   return (
     <div className="row top" style={{ gap: 14 }}>
       <Card compact style={{ width: 320, flexShrink: 0 }}>
         <div className="stack" style={{ gap: 10 }}>
           <div className="row">
-            <TextField placeholder="Hledat balíček…" value={t.packageQuery} onChange={(v) => t.set({ packageQuery: v })} />
+            <TextField placeholder={a.search} value={t.packageQuery} onChange={(v) => t.set({ packageQuery: v })} />
             <Button small icon={<RefreshCw size={13} />} onClick={() => void t.loadPackages()} />
           </div>
-          <Switch label="Včetně systémových" checked={t.includeSystem} onChange={(v) => { t.set({ includeSystem: v }); void t.loadPackages(); }} />
+          <Switch label={a.includeSystem} checked={t.includeSystem} onChange={(v) => { t.set({ includeSystem: v }); void t.loadPackages(); }} />
           {t.loadingPackages && <Spinner />}
           <div style={{ height: 300, overflowY: "auto" }}>
             {filtered.map((p) => (
@@ -259,15 +270,15 @@ function AppsSection() {
             ))}
           </div>
           <div className="row">
-            <span className="mono-sm c-muted">{filtered.length} aplikací</span>
+            <span className="mono-sm c-muted">{a.count(filtered.length)}</span>
             <div className="spacer" />
             {t.removedSystemPackages.length > 0 && (
-              <Menu label={<span className="row" style={{ gap: 5, fontSize: 11.5 }}><Undo2 size={12} /> Obnovit odebrané ({t.removedSystemPackages.length})</span>}>
+              <Menu label={<span className="row" style={{ gap: 5, fontSize: 11.5 }}><Undo2 size={12} /> {a.restoreRemoved(t.removedSystemPackages.length)}</span>}>
                 {(close) => (
                   <>
-                    <div className="menu-label"><Kicker muted>odebrané systémové aplikace</Kicker></div>
+                    <div className="menu-label"><Kicker muted>{a.removedKicker}</Kicker></div>
                     {t.removedSystemPackages.map((p) => (
-                      <button key={p} className="menu-item mono" onClick={() => { close(); void t.restoreSystemPackage(p); }}>Obnovit {p}</button>
+                      <button key={p} className="menu-item mono" onClick={() => { close(); void t.restoreSystemPackage(p); }}>{a.restore(p)}</button>
                     ))}
                   </>
                 )}
@@ -280,41 +291,41 @@ function AppsSection() {
         {pkg ? (
           <div className="stack" style={{ gap: 14 }}>
             <div className="row top">
-              <CardTitle kicker={system ? "systémová aplikace" : "aplikace"} title={<span className="selectable">{pkg}</span>} />
+              <CardTitle kicker={system ? a.systemKicker : a.appKicker} title={<span className="selectable">{pkg}</span>} />
               <div className="spacer" />
-              {system && <Pill color="var(--warn)" dot={false}>systémová</Pill>}
+              {system && <Pill color="var(--warn)" dot={false}>{a.systemPill}</Pill>}
             </div>
             <InfoGrid rows={t.packageDetails} />
             <div className="row wrap">
-              <Button variant="primary" small icon={<Play size={13} />} onClick={() => t.launch(pkg)}>Spustit</Button>
-              <Button small icon={<Square size={13} />} onClick={() => t.forceStop(pkg)}>Zastavit</Button>
-              <Button small icon={<Settings size={13} />} onClick={() => t.openSettings(pkg)}>Nastavení</Button>
-              <Button small icon={<FileDown size={13} />} onClick={() => void t.pullApk(pkg)}>Stáhnout APK</Button>
+              <Button variant="primary" small icon={<Play size={13} />} onClick={() => t.launch(pkg)}>{m.common.launch}</Button>
+              <Button small icon={<Square size={13} />} onClick={() => t.forceStop(pkg)}>{m.common.stop}</Button>
+              <Button small icon={<Settings size={13} />} onClick={() => t.openSettings(pkg)}>{m.common.settings}</Button>
+              <Button small icon={<FileDown size={13} />} onClick={() => void t.pullApk(pkg)}>{a.pullApk}</Button>
             </div>
             <div className="row wrap">
               <Button small icon={<Eraser size={13} />} onClick={() => setConfirm({
-                title: `Vymazat data aplikace ${pkg}?`,
-                message: "Smaže se přihlášení, nastavení, cache i uložené soubory aplikace. Tohle nejde vrátit.",
-                confirm: "Vymazat data",
+                title: m.confirm.clearDataTitle(pkg),
+                message: m.confirm.clearDataMessage,
+                confirm: m.common.clearData,
                 action: () => t.clearData(pkg),
-              })}>Vymazat data</Button>
+              })}>{m.common.clearData}</Button>
               <Button small icon={<Trash2 size={13} />} onClick={() => setConfirm(system ? {
-                title: `Odebrat systémovou aplikaci ${pkg}?`,
-                message: "⚠️ Systémové aplikace jsou součástí Androidu nebo nadstavby výrobce. Jejich odebrání může rozbít funkce systému: spouštěč, notifikace, aktualizace, platby, fotoaparát nebo i start telefonu.\n\nAplikace se odebere jen pro aktuálního uživatele, z disku nezmizí. Vrátit ji jde přes „Obnovit odebrané“, v krajním případě továrním resetem.\n\nPokračuj, jen pokud víš, co ta aplikace dělá.",
-                confirm: "Rozumím riziku, odebrat",
+                title: a.removeSystemTitle(pkg),
+                message: a.removeSystemMessage,
+                confirm: a.removeSystemConfirm,
                 action: () => void t.uninstall(pkg),
               } : {
-                title: `Odinstalovat ${pkg}?`,
-                message: "Aplikace i její data zmizí z telefonu.",
-                confirm: "Odinstalovat",
+                title: m.confirm.uninstallTitle(pkg),
+                message: m.confirm.uninstallPhoneMessage,
+                confirm: m.common.uninstall,
                 action: () => void t.uninstall(pkg),
-              })}>{system ? "Odebrat systémovou aplikaci" : "Odinstalovat"}</Button>
+              })}>{system ? a.removeSystem : m.common.uninstall}</Button>
             </div>
           </div>
         ) : (
           <div className="stack" style={{ gap: 10 }}>
-            <CardTitle kicker="aplikace" title="Vyber aplikaci vlevo" subtitle="Spuštění, zastavení, vymazání dat, odinstalace nebo stažení APK z telefonu do počítače." />
-            <div><Button small icon={<Eye size={13} />} onClick={t.showCurrentActivity}>Co je teď na displeji?</Button></div>
+            <CardTitle kicker={a.appKicker} title={a.pickTitle} subtitle={a.pickSubtitle} />
+            <div><Button small icon={<Eye size={13} />} onClick={t.showCurrentActivity}>{a.currentActivity}</Button></div>
           </div>
         )}
       </Card>
@@ -330,6 +341,8 @@ const levelColor: Record<string, string> = { E: "var(--danger)", F: "var(--dange
 function LogcatSection() {
   const t = useToolset();
   const end = useRef<HTMLDivElement>(null);
+  const m = useT();
+  const l = m.toolset.logcat;
   const visible = useMemo(() => {
     const q = t.logcatFilter.trim().toLowerCase();
     const lines = q ? t.logcat.filter((l) => l.text.toLowerCase().includes(q)) : t.logcat;
@@ -342,21 +355,21 @@ function LogcatSection() {
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
       <div className="row" style={{ padding: "0 24px 10px" }}>
         {t.logcatRunning ? (
-          <Button variant="primary" small icon={<Square size={13} />} onClick={t.stopLogcat}>Zastavit</Button>
+          <Button variant="primary" small icon={<Square size={13} />} onClick={t.stopLogcat}>{m.common.stop}</Button>
         ) : (
-          <Button variant="primary" small icon={<Play size={13} />} onClick={() => void t.startLogcat()}>Spustit</Button>
+          <Button variant="primary" small icon={<Play size={13} />} onClick={() => void t.startLogcat()}>{m.common.launch}</Button>
         )}
         <select className="field" style={{ width: 110 }} value={t.logcatLevel} disabled={t.logcatRunning} onChange={(e) => t.set({ logcatLevel: e.target.value as LogLevel })}>
           {LOG_LEVELS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
         </select>
-        <TextField placeholder="balíček (volitelné)" value={t.logcatPackage} disabled={t.logcatRunning} onChange={(v) => t.set({ logcatPackage: v })} style={{ width: 210 }} />
-        <TextField placeholder="Filtrovat text…" value={t.logcatFilter} onChange={(v) => t.set({ logcatFilter: v })} />
-        <Button small icon={t.logcatPaused ? <Play size={13} /> : <Pause size={13} />} title={t.logcatPaused ? "Pokračovat" : "Pozastavit výpis"} onClick={() => t.set({ logcatPaused: !t.logcatPaused })} />
-        <Button small icon={<Trash2 size={13} />} title="Vymazat buffer" onClick={t.clearLogcat} />
-        <Button small icon={<Save size={13} />} title="Uložit do souboru" disabled={!t.logcat.length} onClick={() => void t.saveLogcat()} />
+        <TextField placeholder={l.packagePlaceholder} value={t.logcatPackage} disabled={t.logcatRunning} onChange={(v) => t.set({ logcatPackage: v })} style={{ width: 210 }} />
+        <TextField placeholder={l.filterPlaceholder} value={t.logcatFilter} onChange={(v) => t.set({ logcatFilter: v })} />
+        <Button small icon={t.logcatPaused ? <Play size={13} /> : <Pause size={13} />} title={t.logcatPaused ? l.resume : l.pause} onClick={() => t.set({ logcatPaused: !t.logcatPaused })} />
+        <Button small icon={<Trash2 size={13} />} title={l.clearBuffer} onClick={t.clearLogcat} />
+        <Button small icon={<Save size={13} />} title={l.save} disabled={!t.logcat.length} onClick={() => void t.saveLogcat()} />
       </div>
       <div className="selectable" style={{ flex: 1, overflowY: "auto", background: "var(--surface-1)", padding: "10px 24px", fontFamily: "var(--font-mono)", fontSize: 10.5 }}>
-        {!t.logcat.length && <div className="mono c-muted">{t.logcatRunning ? "$ čekám na logy…" : "$ logcat zatím neběží. Klikni na Spustit."}</div>}
+        {!t.logcat.length && <div className="mono c-muted">{t.logcatRunning ? l.waiting : l.idle}</div>}
         {visible.map((l) => (
           <div key={l.id} style={{ color: levelColor[l.level] ?? "var(--text-muted)", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{l.text}</div>
         ))}
@@ -368,56 +381,60 @@ function LogcatSection() {
 
 /* ---------- Control ---------- */
 
-const KEYS: [number, string, typeof Home][] = [
-  [3, "Domů", Home], [4, "Zpět", ChevronLeft], [187, "Aplikace", Layers], [26, "Power", Power],
-  [224, "Probudit", Sun], [82, "Odemknout", Lock], [24, "Hlasitost +", Volume2], [25, "Hlasitost −", Volume1],
+type KeyLabel = keyof Messages["toolset"]["control"]["keys"];
+
+const KEYS: [number, KeyLabel, typeof Home][] = [
+  [3, "home", Home], [4, "back", ChevronLeft], [187, "apps", Layers], [26, "power", Power],
+  [224, "wake", Sun], [82, "unlock", Lock], [24, "volumeUp", Volume2], [25, "volumeDown", Volume1],
 ];
 
 function ControlSection() {
   const t = useToolset();
+  const m = useT();
+  const c = m.toolset.control;
   return (
     <div className="stack" style={{ gap: 14 }}>
       <div className="grid-2">
         <Card>
           <div className="stack" style={{ gap: 10 }}>
-            <CardTitle kicker="obrazovka" title="Screenshot a video" subtitle="Ukládá se na plochu a rovnou se otevře." />
+            <CardTitle kicker={c.screenKicker} title={c.screenTitle} subtitle={c.screenSubtitle} />
             <div className="row">
-              <Button small icon={<Camera size={13} />} onClick={t.screenshot}>Screenshot</Button>
+              <Button small icon={<Camera size={13} />} onClick={t.screenshot}>{c.screenshot}</Button>
               {t.recordingSince ? (
                 <Button variant="primary" small icon={<Circle size={10} fill="currentColor" />} onClick={() => void t.toggleRecording()}>
-                  Zastavit · <Elapsed since={t.recordingSince} className="mono" />
+                  {c.stopRecording} · <Elapsed since={t.recordingSince} className="mono" />
                 </Button>
               ) : (
-                <Button small icon={<Circle size={13} />} onClick={() => void t.toggleRecording()}>Nahrát video</Button>
+                <Button small icon={<Circle size={13} />} onClick={() => void t.toggleRecording()}>{c.record}</Button>
               )}
             </div>
           </div>
         </Card>
         <Card>
           <div className="stack" style={{ gap: 10 }}>
-            <CardTitle kicker="text" title="Napsat do telefonu" subtitle="Do aktivního pole. Jen ASCII, diakritiku adb neumí." />
+            <CardTitle kicker={c.textKicker} title={c.textTitle} subtitle={c.textSubtitle} />
             <div className="row">
               <TextField placeholder="test@example.com" value={t.typeText} onChange={(v) => t.set({ typeText: v })} onSubmit={t.sendText} />
-              <Button variant="primary" small disabled={!t.typeText} onClick={t.sendText}>Odeslat</Button>
+              <Button variant="primary" small disabled={!t.typeText} onClick={t.sendText}>{c.send}</Button>
             </div>
           </div>
         </Card>
       </div>
       <Card>
         <div className="stack" style={{ gap: 10 }}>
-          <CardTitle kicker="tlačítka" title="Dálkové ovládání" />
+          <CardTitle kicker={c.keysKicker} title={c.keysTitle} />
           <div className="grid-4">
-            {KEYS.map(([code, label, Icon]) => <Button key={code} small icon={<Icon size={13} />} onClick={() => t.key(code, label)}>{label}</Button>)}
+            {KEYS.map(([code, label, Icon]) => <Button key={code} small icon={<Icon size={13} />} onClick={() => t.key(code, c.keys[label])}>{c.keys[label]}</Button>)}
           </div>
-          <div><Button variant="link" onClick={t.openDeveloperOptions}>Otevřít Možnosti pro vývojáře</Button></div>
+          <div><Button variant="link" onClick={t.openDeveloperOptions}>{c.developerOptions}</Button></div>
         </div>
       </Card>
       <Card>
         <div className="stack" style={{ gap: 10 }}>
-          <CardTitle kicker="deep link" title="Otevřít URL v telefonu" subtitle="Webový odkaz i vlastní schéma aplikace, třeba myapp://detail/42." />
+          <CardTitle kicker={c.deepLinkKicker} title={c.deepLinkTitle} subtitle={c.deepLinkSubtitle} />
           <div className="row">
-            <TextField placeholder="https://… nebo myapp://…" value={t.deepLink} onChange={(v) => t.set({ deepLink: v })} onSubmit={() => t.openDeepLink()} />
-            <Button variant="primary" small disabled={!t.deepLink} onClick={() => t.openDeepLink()}>Otevřít</Button>
+            <TextField placeholder={c.deepLinkPlaceholder} value={t.deepLink} onChange={(v) => t.set({ deepLink: v })} onSubmit={() => t.openDeepLink()} />
+            <Button variant="primary" small disabled={!t.deepLink} onClick={() => t.openDeepLink()}>{m.common.open}</Button>
           </div>
           {t.deepLinkHistory.map((link) => (
             <button key={link} className="btn plain mono-sm" style={{ justifyContent: "flex-start" }} onClick={() => { t.set({ deepLink: link }); t.openDeepLink(link); }}>↺ {link}</button>
@@ -430,20 +447,20 @@ function ControlSection() {
 
 /* ---------- Wireless ---------- */
 
-const stateBadge: Record<WirelessState, [string, string]> = {
-  connected: ["Připojeno", "var(--light-cyan)"],
-  reconnecting: ["Obnovuji…", "var(--accent)"],
-  waiting: ["Čekám na telefon", "var(--warn)"],
-  unreachable: ["Nedostupné", "var(--danger)"],
-  paused: ["Odpojeno ručně", "var(--text-muted)"],
-  disconnected: ["Odpojeno", "var(--text-muted)"],
+const stateColor: Record<WirelessState, string> = {
+  connected: "var(--light-cyan)",
+  reconnecting: "var(--accent)",
+  waiting: "var(--warn)",
+  unreachable: "var(--danger)",
+  paused: "var(--text-muted)",
+  disconnected: "var(--text-muted)",
 };
 
 function KnownRow({ k }: { k: KnownWireless }) {
   const w = useWireless();
   useInstaller((s) => s.devices);
   const state = wirelessStatus(k);
-  const [label, color] = stateBadge[state];
+  const m = useT().toolset.wireless;
   return (
     <div className="list-row" style={{ background: "var(--surface-1)" }}>
       {state === "connected" ? <Wifi size={15} color="var(--accent)" /> : <WifiOff size={15} color="var(--text-muted)" />}
@@ -452,9 +469,9 @@ function KnownRow({ k }: { k: KnownWireless }) {
         <span className="mono-sm c-muted truncate selectable">{k.address}</span>
       </div>
       {state === "reconnecting" && <Spinner />}
-      <Pill color={color}>{label}</Pill>
-      {state !== "connected" && <Button small disabled={state === "reconnecting"} onClick={() => void w.reconnect(k, true)}>Znovu připojit</Button>}
-      <Button variant="plain" icon={<Trash2 size={14} />} title="Zapomenout zařízení" onClick={() => w.forget(k)} />
+      <Pill color={stateColor[state]}>{m.states[state]}</Pill>
+      {state !== "connected" && <Button small disabled={state === "reconnecting"} onClick={() => void w.reconnect(k, true)}>{m.reconnect}</Button>}
+      <Button variant="plain" icon={<Trash2 size={14} />} title={m.forget} onClick={() => w.forget(k)} />
     </div>
   );
 }
@@ -465,6 +482,8 @@ function WirelessSection() {
   const device = useDevice();
   const devices = useInstaller((s) => s.devices);
   const platform = useApp((s) => s.paths?.platform);
+  const msg = useT();
+  const m = msg.toolset.wireless;
   return (
     <div className="stack" style={{ gap: 14 }}>
       {w.localNetworkBlocked && (
@@ -472,16 +491,12 @@ function WirelessSection() {
           <div className="row top" style={{ gap: 12 }}>
             <Network size={20} color="var(--danger)" />
             <div className="stack" style={{ gap: 6, flex: 1 }}>
-              <Kicker color="var(--danger)">{platform === "macos" ? "macOS blokuje místní síť" : "k telefonu nevede cesta"}</Kicker>
-              <span style={{ fontWeight: 600, fontSize: 13.5 }}>Bez přístupu do místní sítě se k telefonu přes Wi‑Fi nedostanu.</span>
-              <span className="caption secondary">
-                {platform === "macos"
-                  ? "Nastavení → Soukromí a zabezpečení → Místní síť → zapni Simple ADB tools."
-                  : "Zkontroluj, že je telefon ve stejné síti a že Windows Firewall nepovoluje jen veřejné sítě."}
-              </span>
+              <Kicker color="var(--danger)">{platform === "macos" ? m.macBlockedKicker : m.noRouteKicker}</Kicker>
+              <span style={{ fontWeight: 600, fontSize: 13.5 }}>{m.blockedTitle}</span>
+              <span className="caption secondary">{platform === "macos" ? m.macBlockedHint : m.noRouteHint}</span>
               <div className="row">
-                <Button variant="primary" small icon={<Settings size={13} />} onClick={w.openLocalNetworkSettings}>Otevřít nastavení</Button>
-                <Button small disabled={!t.connectHost} onClick={() => void t.connect()}>Zkusit znovu</Button>
+                <Button variant="primary" small icon={<Settings size={13} />} onClick={w.openLocalNetworkSettings}>{m.openSettings}</Button>
+                <Button small disabled={!t.connectHost} onClick={() => void t.connect()}>{msg.common.tryAgain}</Button>
               </div>
             </div>
           </div>
@@ -489,28 +504,28 @@ function WirelessSection() {
       )}
       <Card highlight>
         <div className="row" style={{ gap: 14 }}>
-          <CardTitle kicker="nejrychlejší cesta" title="Přepnout připojený telefon na Wi‑Fi" subtitle="Telefon musí být na kabelu a ve stejné síti jako počítač. Pak kabel odpojíš a ladíš bezdrátově." />
+          <CardTitle kicker={m.fastestKicker} title={m.switchTitle} subtitle={m.switchSubtitle} />
           <div className="spacer" />
-          <Button variant="primary" small icon={<Wifi size={13} />} disabled={!device || isWireless(device) || isEmulator(device)} onClick={() => void t.switchToWifi()}>Přepnout na Wi‑Fi</Button>
+          <Button variant="primary" small icon={<Wifi size={13} />} disabled={!device || isWireless(device) || isEmulator(device)} onClick={() => void t.switchToWifi()}>{m.switch}</Button>
         </div>
       </Card>
       <div className="grid-2">
         <Card>
           <div className="stack" style={{ gap: 10 }}>
-            <CardTitle kicker="connect" title="Připojit podle adresy" subtitle="IP adresa telefonu, port 5555 doplním sám." />
+            <CardTitle kicker="connect" title={m.connectTitle} subtitle={m.connectSubtitle} />
             <div className="row">
               <TextField placeholder="192.168.1.42:5555" value={t.connectHost} onChange={(v) => t.set({ connectHost: v })} onSubmit={() => void t.connect()} />
-              <Button small disabled={!t.connectHost} onClick={() => void t.connect()}>Připojit</Button>
+              <Button small disabled={!t.connectHost} onClick={() => void t.connect()}>{m.connect}</Button>
             </div>
           </div>
         </Card>
         <Card>
           <div className="stack" style={{ gap: 10 }}>
-            <CardTitle kicker="android 11+" title="Spárovat bez kabelu" subtitle="Bezdrátové ladění → Spárovat pomocí kódu." />
+            <CardTitle kicker="android 11+" title={m.pairTitle} subtitle={m.pairSubtitle} />
             <div className="row">
               <TextField placeholder="192.168.1.42:37123" value={t.pairHost} onChange={(v) => t.set({ pairHost: v })} />
-              <TextField placeholder="kód" value={t.pairCode} onChange={(v) => t.set({ pairCode: v })} onSubmit={() => void t.pair()} style={{ width: 90 }} />
-              <Button small disabled={!t.pairHost || !t.pairCode} onClick={() => void t.pair()}>Spárovat</Button>
+              <TextField placeholder={m.code} value={t.pairCode} onChange={(v) => t.set({ pairCode: v })} onSubmit={() => void t.pair()} style={{ width: 90 }} />
+              <Button small disabled={!t.pairHost || !t.pairCode} onClick={() => void t.pair()}>{m.pair}</Button>
             </div>
           </div>
         </Card>
@@ -519,16 +534,16 @@ function WirelessSection() {
         <div className="stack" style={{ gap: 12 }}>
           <div className="row top">
             <CardTitle
-              kicker="známá zařízení"
-              title={w.known.length ? "Telefony, které už byly přes Wi‑Fi" : "Zatím žádné zařízení přes Wi‑Fi"}
-              subtitle="Když spojení spadne, obnovím ho sám. U Androidu 11+ si najdu i nový port."
+              kicker={m.knownKicker}
+              title={w.known.length ? m.knownTitle : m.knownEmpty}
+              subtitle={m.knownSubtitle}
             />
             <div className="spacer" />
-            <Button small icon={<WifiOff size={13} />} disabled={!devices.some(isWireless)} onClick={() => void t.disconnectAll()}>Odpojit všechna</Button>
+            <Button small icon={<WifiOff size={13} />} disabled={!devices.some(isWireless)} onClick={() => void t.disconnectAll()}>{m.disconnectAll}</Button>
           </div>
-          <Switch label="Automaticky obnovovat spojení" title="Při výpadku zkouším spojení obnovit několik minut, pak přestanu." checked={w.autoReconnect} onChange={w.setAutoReconnect} />
+          <Switch label={m.autoReconnect} title={m.autoReconnectHelp} checked={w.autoReconnect} onChange={w.setAutoReconnect} />
           {w.known.length > 0 && <div className="list">{w.known.map((k) => <KnownRow key={knownId(k)} k={k} />)}</div>}
-          <span className="caption">Telefon přepnutý přes „Přepnout na Wi‑Fi“ (port 5555) po restartu ladění přes Wi‑Fi vypne. Pak je potřeba ho jednou připojit kabelem.</span>
+          <span className="caption">{m.tcpipHint}</span>
         </div>
       </Card>
     </div>
@@ -539,28 +554,29 @@ function WirelessSection() {
 
 function DeveloperSection() {
   const t = useToolset();
+  const m = useT().toolset.developer;
   return (
     <div className="stack" style={{ gap: 14 }}>
       <div className="grid-2">
-        {DEV_TOGGLES.map((toggle) => {
-          const on = t.toggles[toggle.id];
+        {DEV_TOGGLES.map((id) => {
+          const on = t.toggles[id];
           return (
-            <Card key={toggle.id} highlight={on === true}>
+            <Card key={id} highlight={on === true}>
               <div className="row top" style={{ gap: 12, minHeight: 54 }}>
                 <div className="stack" style={{ gap: 4, flex: 1 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13.5 }}>{toggle.title}</span>
-                  <span className="caption">{toggle.help}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13.5 }}>{m.toggles[id].title}</span>
+                  <span className="caption">{m.toggles[id].help}</span>
                 </div>
-                {on === undefined ? <Spinner /> : <Switch label="" checked={on} onChange={(v) => void t.setToggle(toggle.id, v)} />}
+                {on === undefined ? <Spinner /> : <Switch label="" checked={on} onChange={(v) => void t.setToggle(id, v)} />}
               </div>
             </Card>
           );
         })}
       </div>
       <div className="row">
-        <span className="caption">Přepínače mění systémová nastavení telefonu. Před odevzdáním zařízení je vrať zpět.</span>
+        <span className="caption">{m.hint}</span>
         <div className="spacer" />
-        <Button small icon={<RefreshCw size={13} />} onClick={() => void t.loadToggles()}>Načíst stav</Button>
+        <Button small icon={<RefreshCw size={13} />} onClick={() => void t.loadToggles()}>{m.reload}</Button>
       </div>
     </div>
   );
@@ -568,30 +584,34 @@ function DeveloperSection() {
 
 /* ---------- Shell ---------- */
 
-const SNIPPETS: [string, string][] = [
-  ["Aktuální aktivita", "dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity'"],
-  ["Baterie", "dumpsys battery"],
-  ["Úložiště", "df -h /data"],
-  ["Paměť", "cat /proc/meminfo | head -5"],
-  ["Fingerprint", "getprop ro.build.fingerprint"],
-  ["Displej", "wm size; wm density"],
+type SnippetLabel = keyof Messages["toolset"]["shell"]["snippets"];
+
+const SNIPPETS: [SnippetLabel, string][] = [
+  ["activity", "dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity'"],
+  ["battery", "dumpsys battery"],
+  ["storage", "df -h /data"],
+  ["memory", "cat /proc/meminfo | head -5"],
+  ["fingerprint", "getprop ro.build.fingerprint"],
+  ["display", "wm size; wm density"],
 ];
 
 function ShellSection() {
   const t = useToolset();
+  const msg = useT();
+  const m = msg.toolset.shell;
   return (
     <div className="stack" style={{ gap: 12 }}>
       <div className="row">
         <span className="mono c-accent">$</span>
-        <TextField placeholder="adb shell příkaz, třeba: pm list packages -3" value={t.shellCommand} onChange={(v) => t.set({ shellCommand: v })} onSubmit={() => void t.runShell()} />
-        <Button variant="primary" small disabled={!t.shellCommand || t.shellRunning} onClick={() => void t.runShell()}>Spustit</Button>
-        <Button small disabled={!t.shellHistory.length} onClick={() => t.set({ shellHistory: [] })}>Vymazat</Button>
+        <TextField placeholder={m.placeholder} value={t.shellCommand} onChange={(v) => t.set({ shellCommand: v })} onSubmit={() => void t.runShell()} />
+        <Button variant="primary" small disabled={!t.shellCommand || t.shellRunning} onClick={() => void t.runShell()}>{msg.common.launch}</Button>
+        <Button small disabled={!t.shellHistory.length} onClick={() => t.set({ shellHistory: [] })}>{m.clear}</Button>
       </div>
       <div className="row wrap">
-        {SNIPPETS.map(([title, cmd]) => <Button key={title} small title={cmd} onClick={() => void t.runShell(cmd)}>{title}</Button>)}
+        {SNIPPETS.map(([label, cmd]) => <Button key={label} small title={cmd} onClick={() => void t.runShell(cmd)}>{m.snippets[label]}</Button>)}
       </div>
       <div className="console">
-        {!t.shellHistory.length && <span className="c-muted">Výstup se objeví tady. Příkazy běží přímo v telefonu přes adb shell.</span>}
+        {!t.shellHistory.length && <span className="c-muted">{m.empty}</span>}
         {[...t.shellHistory].reverse().map((e) => (
           <div key={e.id} style={{ marginBottom: 12 }}>
             <div style={{ color: e.ok ? "var(--accent)" : "var(--danger)" }}>$ {e.command}</div>
@@ -613,6 +633,7 @@ export function ToolsetView() {
   const { reload, deviceChanged } = useToolset.getState();
   const serial = device?.serial;
   const first = useRef(true);
+  const m = useT().toolset;
 
   useEffect(() => {
     if (first.current) {
@@ -640,9 +661,9 @@ export function ToolsetView() {
       <div style={{ padding: "24px 24px 14px", display: "flex", flexDirection: "column", gap: 16 }}>
         <SectionHeader
           number={tabNumber("toolset")}
-          kicker="adb toolset"
-          title="Všechno, kvůli čemu bys otevíral terminál"
-          lede="Logcat, správa aplikací, zrcadlení, video, deep linky, Wi‑Fi ladění i vývojářské přepínače. Jedním klikem."
+          kicker={m.kicker}
+          title={m.title}
+          lede={m.lede}
           trailing={<DevicePicker />}
         />
         <SectionNav />
@@ -653,10 +674,10 @@ export function ToolsetView() {
             <div className="row" style={{ gap: 12 }}>
               <Cable size={18} color="var(--text-muted)" />
               <div className="stack" style={{ gap: 2, flex: 1 }}>
-                <span style={{ fontWeight: 600 }}>Žádný připojený telefon</span>
-                <span className="caption">Nástroje se odemknou, jakmile připojíš telefon s laděním USB nebo přes Wi‑Fi.</span>
+                <span style={{ fontWeight: 600 }}>{m.noPhone}</span>
+                <span className="caption">{m.noPhoneHint}</span>
               </div>
-              <Button small onClick={() => setTab("requirements")}>Návod →</Button>
+              <Button small onClick={() => setTab("requirements")}>{m.guide}</Button>
             </div>
           </Card>
         </div>

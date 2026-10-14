@@ -6,23 +6,13 @@ import { tabNumber, useApp } from "../state/app";
 import { allReady, useToolchain } from "../state/toolchain";
 import { useInstaller } from "../state/installer";
 import { Button, Card, Pill, Progress, SectionHeader, Spinner } from "../components/ui";
+import { megabytes } from "../lib/format";
+import { useT } from "../i18n";
 
-const TOOLS: { tool: ToolName; title: string; requirement: string; description: string; size: string }[] = [
-  { tool: "adb", title: "Android Debug Bridge (adb)", requirement: "Povinné", description: "Komunikuje s telefonem: instalace, odinstalace, screenshoty.", size: "16 MB" },
-  {
-    tool: "aapt2",
-    title: "Android Asset Packaging Tool (aapt2)",
-    requirement: "Doporučené",
-    description: "Čte z APK název aplikace, balíček a verzi. Bez něj nepůjde reinstall ani porovnání s verzí v telefonu.",
-    size: "4,5 MB",
-  },
-  {
-    tool: "scrcpy",
-    title: "scrcpy",
-    requirement: "Volitelné",
-    description: "Zrcadlení obrazovky telefonu s ovládáním myší a klávesnicí, se zvukem i nahráváním. Open source od Genymobile.",
-    size: "13 MB",
-  },
+const TOOLS: { tool: ToolName; title: string; requirement: "required" | "recommended" | "optional"; sizeMb: number }[] = [
+  { tool: "adb", title: "Android Debug Bridge (adb)", requirement: "required", sizeMb: 16 },
+  { tool: "aapt2", title: "Android Asset Packaging Tool (aapt2)", requirement: "recommended", sizeMb: 4.5 },
+  { tool: "scrcpy", title: "scrcpy", requirement: "optional", sizeMb: 13 },
 ];
 
 function StatusIcon({ status, optional }: { status: ToolStatus; optional: boolean }) {
@@ -39,8 +29,10 @@ function StatusIcon({ status, optional }: { status: ToolStatus; optional: boolea
   }
 }
 
-function ToolCard({ tool, title, requirement, description, size }: (typeof TOOLS)[number]) {
+function ToolCard({ tool, title, requirement, sizeMb }: (typeof TOOLS)[number]) {
   const tc = useToolchain();
+  const t = useT();
+  const m = t.requirements;
   const status = tc[tool];
   const missing = status.kind === "missing" || status.kind === "broken";
   return (
@@ -52,21 +44,21 @@ function ToolCard({ tool, title, requirement, description, size }: (typeof TOOLS
         <div className="stack" style={{ flex: 1, minWidth: 0 }}>
           <div className="row">
             <span className="title-sm">{title}</span>
-            <Pill color={tool === "adb" ? "var(--accent)" : "var(--text-muted)"} dot={false}>{requirement}</Pill>
+            <Pill color={tool === "adb" ? "var(--accent)" : "var(--text-muted)"} dot={false}>{m[requirement]}</Pill>
           </div>
-          <div className="caption">{description}</div>
-          {status.kind === "checking" && <div className="mono c-muted">Hledám…</div>}
-          {status.kind === "missing" && <div className="mono c-warn">Nenašel jsem v Android SDK, v PATH ani ve složce appky.</div>}
+          <div className="caption">{m[`${tool}Description` as const]}</div>
+          {status.kind === "checking" && <div className="mono c-muted">{m.searching}</div>}
+          {status.kind === "missing" && <div className="mono c-warn">{m.notFound}</div>}
           {status.kind === "found" && (
             <div className="stack" style={{ gap: 2 }}>
-              <span className="mono c-cyan">verze {status.version}</span>
+              <span className="mono c-cyan">{m.version(status.version)}</span>
               <span className="mono-sm c-muted truncate selectable">{status.path}</span>
             </div>
           )}
           {status.kind === "broken" && (
             <div className="stack" style={{ gap: 2 }}>
-              <span className="mono c-danger">Nejde spustit: {status.error}</span>
-              {/cpu/i.test(status.error) && <span className="mono-sm c-warn">Binárka je pro Intel. Doinstaluj Rosettu: softwareupdate --install-rosetta</span>}
+              <span className="mono c-danger">{m.cantRun(status.error)}</span>
+              {/cpu/i.test(status.error) && <span className="mono-sm c-warn">{m.rosetta}</span>}
               <span className="mono-sm c-muted truncate">{status.path}</span>
             </div>
           )}
@@ -80,16 +72,16 @@ function ToolCard({ tool, title, requirement, description, size }: (typeof TOOLS
               {missing && (
                 <>
                   <Button variant="primary" small icon={<ArrowDownCircle size={13} />} disabled={!!tc.installing} onClick={() => void tc.install(tool)}>
-                    Stáhnout a nainstalovat ({size})
+                    {m.downloadInstall(megabytes(sizeMb))}
                   </Button>
-                  {tool === "adb" && <Button small onClick={() => void tc.chooseAdb()}>Vybrat ručně…</Button>}
+                  {tool === "adb" && <Button small onClick={() => void tc.chooseAdb()}>{m.chooseManually}</Button>}
                 </>
               )}
               {status.kind === "found" && (
                 <>
-                  <Button small icon={<FolderOpen size={13} />} onClick={() => void revealItemInDir(status.path)}>Ukázat ve složce</Button>
+                  <Button small icon={<FolderOpen size={13} />} onClick={() => void revealItemInDir(status.path)}>{t.common.showInFolder}</Button>
                   {status.managed && (
-                    <Button small icon={<RefreshCw size={13} />} disabled={!!tc.installing} onClick={() => void tc.install(tool)}>Aktualizovat</Button>
+                    <Button small icon={<RefreshCw size={13} />} disabled={!!tc.installing} onClick={() => void tc.install(tool)}>{m.update}</Button>
                   )}
                 </>
               )}
@@ -101,18 +93,14 @@ function ToolCard({ tool, title, requirement, description, size }: (typeof TOOLS
   );
 }
 
-const STEPS = [
-  "Nastavení → O telefonu → 7× klepni na „Číslo sestavení“.",
-  "V Možnostech pro vývojáře zapni „Ladění USB“. Xiaomi a Huawei chtějí i „Instalace přes USB“.",
-  "Připoj telefon kabelem a na displeji potvrď „Povolit ladění USB“.",
-];
-
 function DeviceCard() {
   const { devices, running, restartAdb } = useInstaller();
   const adbReady = useToolchain((s) => s.adb.kind === "found");
   const platform = useApp((s) => s.paths?.platform);
   const ready = devices.filter(isReady).length;
   const unauthorized = devices.some((d) => d.state === "unauthorized");
+  const t = useT();
+  const m = t.requirements;
   return (
     <Card>
       <div className="row top" style={{ gap: 14 }}>
@@ -121,20 +109,20 @@ function DeviceCard() {
         </div>
         <div className="stack" style={{ flex: 1, gap: 8 }}>
           <div className="row">
-            <span className="title-sm">Telefon s laděním USB</span>
-            {ready ? <Pill>Připojeno: {ready}</Pill> : unauthorized ? <Pill color="var(--warn)">Čeká na potvrzení</Pill> : <Pill color="var(--text-muted)">Nepřipojeno</Pill>}
+            <span className="title-sm">{m.phoneTitle}</span>
+            {ready ? <Pill>{m.connectedCount(ready)}</Pill> : unauthorized ? <Pill color="var(--warn)">{m.awaitingConfirm}</Pill> : <Pill color="var(--text-muted)">{m.notConnected}</Pill>}
           </div>
-          {STEPS.map((step, i) => (
+          {m.steps.map((step, i) => (
             <div key={i} className="row top" style={{ gap: 10 }}>
               <span className="mono-sm c-accent" style={{ paddingTop: 1 }}>{String(i + 1).padStart(2, "0")}</span>
               <span className="caption secondary">{step}</span>
             </div>
           ))}
           {platform === "windows" && (
-            <div className="caption c-warn">Windows: pokud telefon nevidíš, nainstaluj ovladač USB od výrobce (Samsung, Xiaomi…) nebo Google USB Driver.</div>
+            <div className="caption c-warn">{m.windowsDriver}</div>
           )}
           <div>
-            <Button small icon={<RotateCw size={13} />} disabled={!adbReady || running} onClick={() => void restartAdb()}>Restartovat adb</Button>
+            <Button small icon={<RotateCw size={13} />} disabled={!adbReady || running} onClick={() => void restartAdb()}>{t.common.restartAdb}</Button>
           </div>
         </div>
       </div>
@@ -146,31 +134,30 @@ export function RequirementsView() {
   const tc = useToolchain();
   const setTab = useApp((s) => s.setTab);
   const ready = allReady(tc);
+  const m = useT().requirements;
   return (
     <div className="scroll">
       <div className="page">
         <SectionHeader
           number={tabNumber("requirements")}
-          kicker="systémové požadavky"
-          title={ready ? "Všechno je připravené" : "Co appka potřebuje"}
-          lede="Bez adb to nepojede. Co chybí, stáhnu sám, přímo od Googlu. Bez Android Studia, bez admin hesla."
-          trailing={<Button small icon={<RotateCw size={13} />} onClick={() => void tc.check()}>Zkontrolovat znovu</Button>}
+          kicker={m.kicker}
+          title={ready ? m.titleReady : m.titleMissing}
+          lede={m.lede}
+          trailing={<Button small icon={<RotateCw size={13} />} onClick={() => void tc.check()}>{m.recheck}</Button>}
         />
         {TOOLS.map((t) => <ToolCard key={t.tool} {...t} />)}
         <DeviceCard />
         {tc.error && <div className="row caption c-danger"><XCircle size={14} /> {tc.error}</div>}
         <div className="stack" style={{ gap: 4 }}>
-          <div className="caption">
-            adb a aapt2 stahuji z dl.google.com, scrcpy z jeho oficiálních vydání na GitHubu (s kontrolou SHA‑256). Stažením adb a aapt2 souhlasíš s licenčními podmínkami Android SDK.
-          </div>
+          <div className="caption">{m.sources}</div>
           <div className="row" style={{ gap: 16 }}>
-            <Button variant="link" onClick={() => void openUrl("https://developer.android.com/studio/terms")}>Licenční podmínky Android SDK ↗</Button>
-            <Button variant="link" onClick={() => void openUrl("https://github.com/Genymobile/scrcpy")}>scrcpy na GitHubu (Apache 2.0) ↗</Button>
+            <Button variant="link" onClick={() => void openUrl("https://developer.android.com/studio/terms")}>{m.sdkTerms}</Button>
+            <Button variant="link" onClick={() => void openUrl("https://github.com/Genymobile/scrcpy")}>{m.scrcpyRepo}</Button>
           </div>
         </div>
         {ready && (
           <div className="row" style={{ justifyContent: "flex-end" }}>
-            <Button variant="primary" onClick={() => setTab("install")}>Pokračovat na instalaci →</Button>
+            <Button variant="primary" onClick={() => setTab("install")}>{m.continue}</Button>
           </div>
         )}
       </div>

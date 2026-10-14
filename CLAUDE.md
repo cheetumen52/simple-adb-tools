@@ -6,8 +6,8 @@ Tauri 2 aplikace (React + TypeScript v `tauri/src`, Rust v `tauri/src-tauri`) pr
 
 - **Každá změna patří do vlastní větve** (`feature/…`, `fix/…`), ne přímo do `main`. Větev pushni a nabídni PR. Merge do `main` dělej jen se souhlasem.
 - **Vydání (tag `v*`, zveřejnění návrhu, mazání nebo přesun tagů) jen po výslovném souhlasu**, i u opravných verzí.
-- **Každá uživatelsky viditelná změna jde do `CHANGELOG.md`** pod `## [Nevydáno]`, česky a ve stejné větvi. Changelog se zobrazuje v aplikaci a z něj vzniká text vydání.
-- **README je anglicky**, ostatní dokumentace a UI česky.
+- **Každá uživatelsky viditelná změna jde do obou changelogů** ve stejné větvi: `CHANGELOG.md` česky pod `## [Nevydáno]`, `CHANGELOG.en.md` anglicky pod `## [Unreleased]`. Musí mít stejné verze, data a počty položek (hlídá to test). Changelog se zobrazuje v aplikaci a z obou vzniká text vydání.
+- **README je anglicky**, ostatní dokumentace česky. UI je česky i anglicky.
 - **Push do GitHubu** jde pod účtem `cheetumen52`, ne aktivním účtem `gh`:
   ```bash
   TOKEN="$(gh auth token --user cheetumen52)"
@@ -30,7 +30,8 @@ CI (`.github/workflows/ci.yml`) spouští totéž na Linuxu a Windows. Windows k
 
 ## Konvence
 
-- **UI texty jsou česky**, přímým tónem značky Hejzlar Development („Pusť APK, zbytek je na mně“). Barvy a písma jsou tokeny v `tauri/src/styles.css` podle hejzlar-development.cz. Nevymýšlej nové barvy.
+- **Žádný text UI ani logu natvrdo v komponentě nebo store.** Patří do `tauri/src/i18n/cs.ts` a stejný klíč do `en.ts` (TypeScript i test hlídají shodu). Komponenty berou texty přes `useT()`, stores a další kód přes `tr()`. Hlášky backendu, které vidí uživatel, jdou přes `i18n::tr("česky", "english")` v Rustu.
+- **Tón textů** je přímý tón značky Hejzlar Development („Pusť APK, zbytek je na mně“ / „Drop an APK, I'll handle the rest“). Barvy a písma jsou tokeny v `tauri/src/styles.css` podle hejzlar-development.cz. Nevymýšlej nové barvy.
 - **Čisté funkce** (parsování výstupů adb, verze, formátování) patří do `tauri/src/lib/` a mají test v `*.test.ts`. Testy staví na reálných výstupech zařízení.
 - **Nový příkaz backendu** se registruje v `lib.rs` → `generate_handler!` a v `src/lib/native.ts`. Nový plugin potřebuje oprávnění v `src-tauri/capabilities/default.json`.
 - **Komentáře** jen tam, kde je důvod nezřejmý (jeden až dva řádky).

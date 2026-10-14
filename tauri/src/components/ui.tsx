@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Check } from "lucide-react";
 import { clock } from "../lib/format";
+import { useT } from "../i18n";
 
 /** Bracket-H mark from the hejzlar-development.cz favicon; `arrow` swaps the dot for a download arrow. */
 export function BrandMark({ size = 28, arrow = false }: { size?: number; arrow?: boolean }) {
@@ -152,6 +153,7 @@ export interface ConfirmRequest {
 }
 
 export function ConfirmDialog({ request, onClose }: { request: ConfirmRequest | null; onClose: () => void }) {
+  const t = useT();
   if (!request) return null;
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -159,7 +161,7 @@ export function ConfirmDialog({ request, onClose }: { request: ConfirmRequest | 
         <h3>{request.title}</h3>
         <p>{request.message}</p>
         <div className="row" style={{ justifyContent: "flex-end", marginTop: 6 }}>
-          <Button onClick={onClose}>Zrušit</Button>
+          <Button onClick={onClose}>{t.common.cancel}</Button>
           <Button
             variant="danger"
             onClick={() => {

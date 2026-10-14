@@ -15,13 +15,26 @@ import { BrandMark, Button, Kicker, Spinner } from "./components/ui";
 import { RequirementsView } from "./views/RequirementsView";
 import { InstallView } from "./views/InstallView";
 import { ToolsetView } from "./views/ToolsetView";
-import { SupportView } from "./views/SupportView";
+import { SettingsView } from "./views/SettingsView";
+import { useI18n, useT } from "./i18n";
 
 let started = false;
+
+function applyLanguage() {
+  const { lang } = useI18n.getState();
+  document.documentElement.lang = lang;
+  void native.setLocale(lang);
+}
 
 async function startup() {
   if (started) return;
   started = true;
+  applyLanguage();
+  useI18n.subscribe((s, prev) => {
+    if (s.lang === prev.lang) return;
+    applyLanguage();
+    useToolset.getState().relocalize();
+  });
   await useApp.getState().init();
   await useToolchain.getState().check();
   if (!allReady(useToolchain.getState())) useApp.getState().setTab("requirements");
@@ -58,13 +71,14 @@ function Header() {
   const { tab, setTab, paths } = useApp();
   const toolchain = useToolchain();
   const update = useUpdates((s) => s.state);
+  const t = useT();
   const alert = toolchain.checkedOnce && !allReady(toolchain);
   return (
     <header className={`header${paths?.platform === "macos" ? " mac" : ""}`} data-tauri-drag-region>
       <BrandMark size={30} arrow />
       <div className="stack brand" style={{ gap: 2 }} data-tauri-drag-region>
         <div className="brand-name">{BRAND.appName}</div>
-        <div className="brand-sub"><Kicker muted>by {BRAND.company}</Kicker></div>
+        <div className="brand-sub"><Kicker muted>{t.header.by} {BRAND.company}</Kicker></div>
       </div>
       <div className="spacer" data-tauri-drag-region />
       {update.kind === "available" && (
@@ -73,22 +87,22 @@ function Header() {
           small
           icon={<Sparkles size={13} />}
           onClick={() => (update.autoInstall ? void useUpdates.getState().install() : void openUrl(update.url))}
-          title={update.autoInstall ? `Nainstalovat verzi ${update.tag} a restartovat` : `Nová verze ${update.tag} – otevře stránku na GitHubu`}
+          title={update.autoInstall ? t.header.installTitle(update.tag) : t.header.releaseTitle(update.tag)}
         >
-          <span className="update-text">{update.autoInstall ? "Aktualizovat na " : "Nová verze "}</span>{update.tag}
+          <span className="update-text">{update.autoInstall ? t.header.updateTo : t.header.newVersion}</span>{update.tag}
         </Button>
       )}
       {update.kind === "installing" && (
         <Button variant="primary" small icon={<Spinner />} disabled>
-          {update.progress != null ? `${Math.round(update.progress * 100)} %` : "Stahuji…"}
+          {update.progress != null ? `${Math.round(update.progress * 100)} %` : t.header.downloading}
         </Button>
       )}
       <nav className="tabs">
-        {TABS.map((t) => (
-          <button key={t.id} className={`tab${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
-            <span className="num">{t.number}</span>
-            {t.short}
-            {t.id === "requirements" && alert && <span className="dot" style={{ background: "var(--warn)" }} />}
+        {TABS.map((item) => (
+          <button key={item.id} className={`tab${tab === item.id ? " active" : ""}`} onClick={() => setTab(item.id)} title={t.tabs[item.id].title}>
+            <span className="num">{item.number}</span>
+            {t.tabs[item.id].short}
+            {item.id === "requirements" && alert && <span className="dot" style={{ background: "var(--warn)" }} />}
           </button>
         ))}
       </nav>
@@ -98,6 +112,8 @@ function Header() {
 
 export default function App() {
   const tab = useApp((s) => s.tab);
+  // Re-render the whole tree on a language switch; components read texts through useT().
+  useI18n((s) => s.lang);
 
   useEffect(() => {
     void startup();
@@ -140,7 +156,7 @@ export default function App() {
         {tab === "requirements" && <RequirementsView />}
         {tab === "install" && <InstallView />}
         {tab === "toolset" && <ToolsetView />}
-        {tab === "support" && <SupportView />}
+        {tab === "settings" && <SettingsView />}
       </div>
     </div>
   );

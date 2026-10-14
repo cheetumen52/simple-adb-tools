@@ -1,3 +1,5 @@
+import { tr } from "../i18n";
+
 export interface Device {
   serial: string;
   state: string;
@@ -7,7 +9,7 @@ export interface Device {
 export const isReady = (d: Device) => d.state === "device";
 export const isEmulator = (d: Device) => d.serial.startsWith("emulator-");
 export const isWireless = (d: Device) => !isEmulator(d) && (d.serial.includes(":") || d.serial.includes("._adb-tls-"));
-export const displayName = (d: Device) => d.model ?? (isReady(d) ? d.serial : "Neznámé zařízení");
+export const displayName = (d: Device) => d.model ?? (isReady(d) ? d.serial : tr().common.unknownDevice);
 
 export function parseDevices(out: string): Device[] {
   return out
@@ -94,48 +96,52 @@ export function packageList(out: string | undefined): string[] {
 /** Single-quotes a value for the device's /system/bin/sh. */
 export const shQuote = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
 
+export type FailureReason =
+  | "updateIncompatible"
+  | "versionDowngrade"
+  | "parseFailed"
+  | "insufficientStorage"
+  | "userRestricted"
+  | "noMatchingAbis"
+  | "olderSdk"
+  | "testOnly"
+  | "deviceOffline"
+  | "deviceNotFound"
+  | "unknown";
+
+/** `reason` keys `failures` in the translations, so the banner follows a language switch. */
 export interface FailureHint {
-  message: string;
+  reason: FailureReason;
   suggestReinstall: boolean;
   retryable: boolean;
   file?: string;
 }
 
-const failureRules: [string, string, boolean, boolean][] = [
-  ["INSTALL_FAILED_UPDATE_INCOMPATIBLE", "V telefonu je stejná aplikace podepsaná jiným klíčem (typicky debug vs. release). Pomůže reinstall, smaže ale data aplikace.", true, false],
-  ["INSTALL_FAILED_VERSION_DOWNGRADE", "Telefon odmítl starší verzi, než má nainstalovanou. Pomůže reinstall, smaže ale data aplikace.", true, false],
-  ["INSTALL_PARSE_FAILED", "Soubor není kompletní APK. Nejspíš se ještě stahuje, počkej na dokončení a zkus to znovu.", false, true],
-  ["INSTALL_FAILED_INSUFFICIENT_STORAGE", "V telefonu dochází místo. Uvolni pár set MB a zkus to znovu.", false, false],
-  ["INSTALL_FAILED_USER_RESTRICTED", "Instalaci zablokoval telefon. Potvrď ji na displeji. Xiaomi a Huawei chtějí v Možnostech pro vývojáře zapnout i „Instalace přes USB“.", false, false],
-  ["INSTALL_FAILED_NO_MATCHING_ABIS", "APK není sestavené pro procesor tohoto telefonu.", false, false],
-  ["INSTALL_FAILED_OLDER_SDK", "Telefon má na tuhle aplikaci moc starý Android.", false, false],
-  ["INSTALL_FAILED_TEST_ONLY", "APK je označené jako test-only. Sestav ho bez android:testOnly.", false, false],
-  ["device offline", "Telefon je offline. Zkontroluj kabel a dej „Restartovat adb“.", false, true],
-  ["not found", "Telefon se odpojil. Zkontroluj kabel a dej „Restartovat adb“.", false, true],
+const failureRules: [string, FailureReason, boolean, boolean][] = [
+  ["INSTALL_FAILED_UPDATE_INCOMPATIBLE", "updateIncompatible", true, false],
+  ["INSTALL_FAILED_VERSION_DOWNGRADE", "versionDowngrade", true, false],
+  ["INSTALL_PARSE_FAILED", "parseFailed", false, true],
+  ["INSTALL_FAILED_INSUFFICIENT_STORAGE", "insufficientStorage", false, false],
+  ["INSTALL_FAILED_USER_RESTRICTED", "userRestricted", false, false],
+  ["INSTALL_FAILED_NO_MATCHING_ABIS", "noMatchingAbis", false, false],
+  ["INSTALL_FAILED_OLDER_SDK", "olderSdk", false, false],
+  ["INSTALL_FAILED_TEST_ONLY", "testOnly", false, false],
+  ["device offline", "deviceOffline", false, true],
+  ["not found", "deviceNotFound", false, true],
 ];
 
 export function parseFailure(output: string): FailureHint {
   const lower = output.toLowerCase();
-  for (const [needle, message, suggestReinstall, retryable] of failureRules) {
-    if (lower.includes(needle.toLowerCase())) return { message, suggestReinstall, retryable };
+  for (const [needle, reason, suggestReinstall, retryable] of failureRules) {
+    if (lower.includes(needle.toLowerCase())) return { reason, suggestReinstall, retryable };
   }
-  return { message: "adb instalaci odmítl bez konkrétního důvodu. Zkus to znovu, případně „Restartovat adb“.", suggestReinstall: false, retryable: true };
+  return { reason: "unknown", suggestReinstall: false, retryable: true };
 }
 
 export function logcatLevel(line: string): string {
   // "-v time": "10-13 15:04:02.123 E/Tag( 1234): message"
   const c = line.split(" ", 3)[2]?.[0];
   return c && "VDIWEF".includes(c) ? c : "I";
-}
-
-export function czechUptime(raw: string): string {
-  const parts = raw.trim().split(" ");
-  const n = Number(parts[0]);
-  if (parts.length === 2 && !Number.isNaN(n)) {
-    if (parts[1].startsWith("day")) return `${n} ${n === 1 ? "den" : n >= 2 && n <= 4 ? "dny" : "dní"}`;
-    if (parts[1].startsWith("min")) return `${n} min`;
-  }
-  return raw.includes(":") ? `${raw} h` : raw;
 }
 
 export interface RecentApp {

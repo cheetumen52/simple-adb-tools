@@ -4,6 +4,7 @@ export type { RecentApp } from "../lib/parse";
 import { native } from "../lib/native";
 import { displayName, packageList, parseRecentApps, sections, shQuote, type Device, type RecentApp } from "../lib/parse";
 import { log } from "./log";
+import { tr } from "../i18n";
 import { readyDevices, targets, useInstaller } from "./installer";
 
 export type RecentAction = "launch" | "restart" | "stop" | "settings" | "clearData" | "uninstall";
@@ -55,20 +56,21 @@ export const useRecentApps = create<RecentAppsState>((set, get) => ({
     if (action === "uninstall") {
       log("command", `adb uninstall ${pkg} → ${displayName(device)}`);
       const r = await native.run("adb", ["-s", device.serial, "uninstall", pkg], 60000);
-      log(r.output.includes("Success") ? "success" : "error", r.output.trim() || "Odinstalace selhala");
+      log(r.output.includes("Success") ? "success" : "error", r.output.trim() || tr().installer.uninstallFailed);
       await get().load();
       return;
     }
     const q = shQuote(pkg);
     const launch = `monkey -p ${q} -c android.intent.category.LAUNCHER 1`;
-    const commands: Record<Exclude<RecentAction, "uninstall">, [string, string]> = {
-      launch: ["Spouštím", launch],
-      restart: ["Restartuji", `am force-stop ${q}; ${launch}`],
-      stop: ["Zastavuji", `am force-stop ${q}`],
-      settings: ["Otevírám nastavení", `am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d ${shQuote(`package:${pkg}`)}`],
-      clearData: ["Mažu data", `pm clear ${q}`],
+    const commands: Record<Exclude<RecentAction, "uninstall">, string> = {
+      launch,
+      restart: `am force-stop ${q}; ${launch}`,
+      stop: `am force-stop ${q}`,
+      settings: `am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d ${shQuote(`package:${pkg}`)}`,
+      clearData: `pm clear ${q}`,
     };
-    const [title, command] = commands[action];
+    const title = tr().actions[action];
+    const command = commands[action];
     log("command", `${title} ${pkg} → ${displayName(device)}`);
     const r = await native.run("adb", ["-s", device.serial, "shell", command], 30000);
     const out = r.output.split("\n").filter((l) => l.trim() && !l.includes("Events injected") && !l.startsWith("  bash arg")).join("\n").trim();

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { isOlder, versionParts } from "./version";
-import { CHANGELOG, noteItems, parseChangelog } from "./changelog";
+import { CHANGELOG, localizedNotes, noteItems, parseChangelog } from "./changelog";
 import { bytes, clock } from "./format";
+import { useI18n } from "../i18n";
 import { baseName, joinPath, parentDir } from "./native";
 import pkg from "../../package.json";
 import tauriConf from "../../src-tauri/tauri.conf.json";
@@ -53,10 +54,24 @@ describe("changelog", () => {
     });
   });
 
-  it("bundled CHANGELOG.md has released entries and covers the app version", () => {
-    expect(CHANGELOG.length).toBeGreaterThan(0);
-    expect(CHANGELOG.every((r) => /^\d+\.\d+\.\d+$/.test(r.version) && r.groups.length > 0)).toBe(true);
-    expect(CHANGELOG.some((r) => r.version === tauriConf.version)).toBe(true);
+  it("bundled changelogs have released entries and cover the app version", () => {
+    for (const releases of Object.values(CHANGELOG)) {
+      expect(releases.length).toBeGreaterThan(0);
+      expect(releases.every((r) => /^\d+\.\d+\.\d+$/.test(r.version) && r.groups.length > 0)).toBe(true);
+      expect(releases.some((r) => r.version === tauriConf.version)).toBe(true);
+    }
+  });
+
+  it("Czech and English changelogs describe the same releases", () => {
+    const shape = (lang: "cs" | "en") => CHANGELOG[lang].map((r) => [r.version, r.date, r.groups.map((g) => g.items.length)]);
+    expect(shape("en")).toEqual(shape("cs"));
+  });
+
+  it("picks the release notes language", () => {
+    const notes = "### Added\n- Thing\n\n<!-- cs -->\n### Přidáno\n- Věc\n\n<!-- end -->\n---\n- install";
+    expect(noteItems(localizedNotes(notes, "en"))).toEqual(["Thing"]);
+    expect(noteItems(localizedNotes(notes, "cs"))).toEqual(["Věc"]);
+    expect(noteItems(localizedNotes("### Přidáno\n- Stará", "en"))).toEqual(["Stará"]);
   });
 
   it("extracts bullet notes and skips bold instruction lines", () => {
@@ -74,7 +89,10 @@ describe("app version", () => {
 describe("format", () => {
   it("formats sizes and clocks", () => {
     expect(bytes(512)).toBe("512 B");
+    useI18n.getState().setSetting("cs");
     expect(bytes(80_100_000)).toBe("80,1 MB");
+    useI18n.getState().setSetting("en");
+    expect(bytes(80_100_000)).toBe("80.1 MB");
     expect(clock(0)).toBe("00:00");
     expect(clock(75.9)).toBe("01:15");
   });

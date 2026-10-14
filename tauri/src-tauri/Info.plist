@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>NSLocalNetworkUsageDescription</key>
-  <string>Simple ADB tools se přes místní síť připojují k telefonům s laděním přes Wi‑Fi.</string>
+  <string>Simple ADB tools connects over the local network to phones with Wi‑Fi debugging.</string>
   <key>NSBonjourServices</key>
   <array>
     <string>_adb._tcp</string>
@@ -11,6 +11,11 @@
     <string>_adb-tls-pairing._tcp</string>
   </array>
   <key>CFBundleDevelopmentRegion</key>
-  <string>cs</string>
+  <string>en</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>en</string>
+    <string>cs</string>
+  </array>
 </dict>
 </plist>

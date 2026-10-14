@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   apkVersion,
   compareVersions,
-  czechUptime,
   displayName,
   isEmulator,
   isReady,
@@ -17,6 +16,7 @@ import {
   sections,
   shQuote,
 } from "./parse";
+import { useI18n } from "../i18n";
 
 // Captured from a real `adb devices -l` with a USB phone, a Wi‑Fi phone, an emulator and an unauthorized device.
 const DEVICES = `List of devices attached
@@ -38,7 +38,10 @@ describe("parseDevices", () => {
   it("turns the model into a readable name", () => {
     expect(devices[0].model).toBe("MAR LX1A");
     expect(displayName(devices[0])).toBe("MAR LX1A");
+    useI18n.getState().setSetting("cs");
     expect(displayName(devices[3])).toBe("Neznámé zařízení");
+    useI18n.getState().setSetting("en");
+    expect(displayName(devices[3])).toBe("Unknown device");
   });
 
   it("classifies transports", () => {
@@ -126,6 +129,7 @@ describe("parseRecentApps", () => {
 describe("parseFailure", () => {
   it("explains signature conflicts and offers reinstall", () => {
     const hint = parseFailure("Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Package com.x signatures do not match]");
+    expect(hint.reason).toBe("updateIncompatible");
     expect(hint.suggestReinstall).toBe(true);
     expect(hint.retryable).toBe(false);
   });
@@ -136,6 +140,7 @@ describe("parseFailure", () => {
 
   it("falls back to a generic retryable hint", () => {
     const hint = parseFailure("adb: failed to install /tmp/x.apk:");
+    expect(hint.reason).toBe("unknown");
     expect(hint.retryable).toBe(true);
     expect(hint.suggestReinstall).toBe(false);
   });
@@ -151,11 +156,4 @@ describe("small helpers", () => {
     expect(logcatLevel("--------- beginning of main")).toBe("I");
   });
 
-  it("translates uptime", () => {
-    expect(czechUptime("19 days")).toBe("19 dní");
-    expect(czechUptime("3 days")).toBe("3 dny");
-    expect(czechUptime("1 day")).toBe("1 den");
-    expect(czechUptime("42 min")).toBe("42 min");
-    expect(czechUptime("3:12")).toBe("3:12 h");
-  });
 });

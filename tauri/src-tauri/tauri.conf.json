@@ -34,8 +34,8 @@
     "active": true,
     "targets": "all",
     "category": "DeveloperTool",
-    "shortDescription": "Instalace APK a každodenní práce s adb",
-    "longDescription": "Simple ADB tools od Hejzlar Development: instalace APK, logcat, zrcadlení obrazovky, Wi‑Fi ladění a další adb nástroje bez terminálu.",
+    "shortDescription": "Install APKs and handle everyday adb work",
+    "longDescription": "Simple ADB tools by Hejzlar Development: APK installs, logcat, screen mirroring, Wi‑Fi debugging and more adb tools without a terminal.",
     "copyright": "© 2026 Hejzlar Development",
     "publisher": "Hejzlar Development",
     "homepage": "https://hejzlar-development.cz",
@@ -59,7 +59,11 @@
       }
     ],
     "macOS": {
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "11.0",
+      "files": {
+        "Resources/cs.lproj/InfoPlist.strings": "locales/cs.lproj/InfoPlist.strings",
+        "Resources/en.lproj/InfoPlist.strings": "locales/en.lproj/InfoPlist.strings"
+      }
     },
     "windows": {
       "nsis": {

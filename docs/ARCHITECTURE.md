@@ -6,6 +6,7 @@ Simple ADB tools je aplikace na [Tauri 2](https://tauri.app): UI v Reactu a Type
 tauri/
 ├── src/                     React + TypeScript
 │   ├── App.tsx              start aplikace, hlavička, záložky, drag & drop, klávesové zkratky
+│   ├── i18n/                texty UI: cs.ts (zdroj tvaru), en.ts, přepínání jazyka
 │   ├── lib/                 čisté funkce bez Tauri (parsery, formátování, verze, changelog) + testy
 │   ├── state/               zustand store pro každou oblast
 │   ├── views/               jedna komponenta na záložku
@@ -53,6 +54,16 @@ Platformní detaily:
 | `mirror` | běžící okna scrcpy a jejich volby |
 | `updates` | kontrola a instalace aktualizací |
 | `log` | sdílený log, přežije znovunačtení WebView (sessionStorage) |
+| `i18n` | zvolený jazyk (`system` / `cs` / `en`) a jazyk, který z něj plyne |
+
+## Jazyky
+
+- Texty jsou v `src/i18n/cs.ts` a `en.ts`. Typ `Messages` vychází z češtiny, takže angličtině nesmí chybět žádný klíč ani parametr. Texty s parametry jsou funkce (`installing: (title) => …`), skloňování řeší každý jazyk ve své funkci.
+- Komponenty používají `useT()`, stores `tr()`. `App` odebírá jazyk, takže přepnutí překreslí celý strom. Informace o zařízení se po přepnutí načtou znovu (`toolset.relocalize`).
+- Výchozí je jazyk systému: první podporovaný jazyk z `navigator.languages`, slovenština dostane češtinu, ostatní angličtinu.
+- Backend drží jazyk v `i18n.rs` (`set_locale`) a podle něj vrací chybové hlášky.
+- Changelog je v `CHANGELOG.md` (česky) a `CHANGELOG.en.md`. Poznámky k vydání obsahují oba jazyky oddělené `<!-- cs -->` a aplikace ukáže ten svůj (`localizedNotes`).
+- macOS dialog o místní síti je lokalizovaný přes `locales/*.lproj/InfoPlist.strings`, instalátor pro Windows přes NSIS (`nsis/Czech.nsh`).
 
 Nastavení se ukládá do `localStorage` (`lib/storage.ts`) a každé čtení má výchozí hodnotu.
 
@@ -66,7 +77,8 @@ Nastavení se ukládá do `localStorage` (`lib/storage.ts`) a každé čtení m�
 
 ## Testy a CI
 
-- `tauri/src/lib/*.test.ts`: parsery na reálných výstupech adb, aapt2 a dumpsys, verze, changelog, formátování, cesty.
+- `tauri/src/lib/*.test.ts`: parsery na reálných výstupech adb, aapt2 a dumpsys, verze, changelog (včetně shody obou jazyků), formátování, cesty.
+- `tauri/src/i18n/i18n.test.ts`: stejné klíče a parametry v češtině i angličtině, žádné prázdné texty, výběr jazyka podle systému.
 - `cargo test`: řazení verzí, výběr APK z argumentů, rozbalování ZIP (včetně ochrany proti path traversal), TCP sonda.
 - `scripts/check-secrets.py` hledá tajné údaje: v pre-commit hooku ve staged souborech, v CI v celém repozitáři a v sestaveném frontendu, který se balí do aplikace.
 - `.github/workflows/ci.yml` běží na každý push a PR: kontrola tajných údajů, typy, testy, build frontendu, kontrola changelogu, `cargo fmt`, `clippy` a testy na Linuxu i Windows.
