@@ -4,6 +4,9 @@ Všechny podstatné změny Simple ADB tools. Anglická verze je v [CHANGELOG.en.
 
 ## [Nevydáno]
 
+### Opraveno
+- macOS: aplikace stažená z GitHubu se hlásila jako „poškozená“. Balík je teď celý podepsaný, takže macOS nabídne obvyklé „Přesto otevřít“.
+
 ## [1.2.0] - 2026-10-14
 
 ### Přidáno
