@@ -7,6 +7,7 @@ import { load, save } from "../lib/storage";
 import { log } from "./log";
 import { useApp } from "./app";
 import { toolReady } from "./toolchain";
+import { tr } from "../i18n";
 
 export type MirrorSource = "screen" | "frontCamera" | "backCamera";
 
@@ -22,8 +23,9 @@ export interface MirrorOptions {
   record: boolean;
 }
 
-export const MIRROR_SIZES: [number, string][] = [[0, "Plné"], [1920, "1920 px"], [1280, "1280 px"], [1024, "1024 px"], [800, "800 px"]];
-export const MIRROR_SOURCES: [MirrorSource, string][] = [["screen", "Obrazovka"], ["frontCamera", "Přední kamera"], ["backCamera", "Zadní kamera"]];
+/** 0 = full resolution. */
+export const MIRROR_SIZES = [0, 1920, 1280, 1024, 800];
+export const MIRROR_SOURCES: MirrorSource[] = ["screen", "frontCamera", "backCamera"];
 
 const defaults: MirrorOptions = {
   source: "screen",
@@ -60,7 +62,7 @@ export const useMirror = create<MirrorState>((set, get) => ({
 
   start: async (device) => {
     if (!toolReady("scrcpy")) {
-      log("error", "Zrcadlení potřebuje scrcpy. Doinstaluj ho v Systémových požadavcích.");
+      log("error", tr().mirrorLog.needsScrcpy);
       return;
     }
     if (streams.has(device.serial)) return;
@@ -98,9 +100,9 @@ export const useMirror = create<MirrorState>((set, get) => ({
           delete running[device.serial];
           set({ running });
           log(status === 0 || status === 2 || status === 130 ? "info" : "error",
-            status === 0 || status === 2 || status === 130 ? `Zrcadlení ${displayName(device)} ukončeno` : `scrcpy skončil s chybou (exit ${status}). Detail je ve výpisu výše.`);
+            status === 0 || status === 2 || status === 130 ? tr().mirrorLog.ended(displayName(device)) : tr().mirrorLog.failed(status));
           if (recording && (await native.pathExists(recording))) {
-            log("success", `✓ Záznam uložen na plochu: ${recording.split(/[\\/]/).pop()}`);
+            log("success", tr().mirrorLog.recordingSaved(recording.split(/[\\/]/).pop() ?? recording));
             void revealItemInDir(recording);
           }
         },
@@ -108,7 +110,7 @@ export const useMirror = create<MirrorState>((set, get) => ({
       streams.set(device.serial, id);
       set({ running: { ...get().running, [device.serial]: Date.now() } });
     } catch (e) {
-      log("error", `scrcpy nejde spustit: ${String(e)}`);
+      log("error", tr().mirrorLog.cantStart(String(e)));
     }
   },
 

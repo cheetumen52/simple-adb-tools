@@ -2,13 +2,14 @@ import { create } from "zustand";
 import { getVersion } from "@tauri-apps/api/app";
 import { native, type SystemPaths } from "../lib/native";
 
-export type Tab = "requirements" | "install" | "toolset" | "support";
+export type Tab = "requirements" | "install" | "toolset" | "settings";
 
-export const TABS: { id: Tab; number: string; title: string; short: string }[] = [
-  { id: "requirements", number: "01", title: "Systémové požadavky", short: "Požadavky" },
-  { id: "install", number: "02", title: "Instalace aplikací", short: "Instalace" },
-  { id: "toolset", number: "03", title: "ADB toolset", short: "ADB toolset" },
-  { id: "support", number: "04", title: "Support", short: "Support" },
+/** Labels live in the translations under `tabs.<id>`. */
+export const TABS: { id: Tab; number: string }[] = [
+  { id: "requirements", number: "01" },
+  { id: "install", number: "02" },
+  { id: "toolset", number: "03" },
+  { id: "settings", number: "04" },
 ];
 
 export const tabNumber = (tab: Tab) => TABS.find((t) => t.id === tab)!.number;

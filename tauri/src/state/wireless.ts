@@ -7,6 +7,7 @@ import { log } from "./log";
 import { useApp } from "./app";
 import { useInstaller } from "./installer";
 import { toolReady } from "./toolchain";
+import { tr } from "../i18n";
 
 export interface KnownWireless {
   address: string;
@@ -143,7 +144,7 @@ export const useWireless = create<WirelessStore>(() => ({
       paused.delete(id);
       failures.set(id, 0);
     } else if ((failures.get(id) ?? 0) === 0) {
-      log("info", `Wi‑Fi spojení s ${k.name} spadlo, obnovuji…`);
+      log("info", tr().wirelessLog.dropped(k.name));
     }
     inFlight.add(id);
     setState(id, "reconnecting");
@@ -168,7 +169,7 @@ export const useWireless = create<WirelessStore>(() => ({
     if (ok) {
       setKnown(get().known.map((x) => (knownId(x) === id ? { ...x, address: target } : x)));
       markConnected(k);
-      log("success", `✓ ${k.name} znovu připojeno přes Wi‑Fi (${target})`);
+      log("success", tr().wirelessLog.reconnected(k.name, target));
       void useInstaller.getState().refreshDevices();
       return;
     }
@@ -177,7 +178,7 @@ export const useWireless = create<WirelessStore>(() => ({
     nextAttempt.set(id, Date.now() + Math.min(60, 5 * 2 ** (count - 1)) * 1000);
     if (count >= MAX_FAILURES) {
       setState(id, "unreachable");
-      log("error", `${k.name} není přes Wi‑Fi dostupné. Automatické obnovení jsem zastavil, zkus „Znovu připojit“.`);
+      log("error", tr().wirelessLog.unreachable(k.name));
     } else {
       setState(id, "waiting");
     }
@@ -203,7 +204,7 @@ export const useWireless = create<WirelessStore>(() => ({
       r = await native.run("adb", ["connect", address], 30000);
       if (r.output.includes("connected to")) {
         useWireless.setState({ localNetworkBlocked: false });
-        log("success", `✓ Připojeno přes Wi‑Fi (${address})`);
+        log("success", tr().wirelessLog.connected(address));
         void useInstaller.getState().refreshDevices();
         return true;
       }
@@ -223,7 +224,7 @@ export const useWireless = create<WirelessStore>(() => ({
       case "reachable":
         if (opts.allowServerRestart ?? true) {
           restartedServerForLAN = true;
-          log("info", "Telefon je v síti dostupný, ale adb server do ní nesmí. Restartuji adb server pod Simple ADB tools…");
+          log("info", tr().wirelessLog.restartingServer);
           await native.run("adb", ["kill-server"], 15000);
           await native.run("adb", ["start-server"], 30000);
         }
@@ -232,18 +233,16 @@ export const useWireless = create<WirelessStore>(() => ({
         useWireless.setState({ localNetworkBlocked: true });
         log(
           "error",
-          useApp.getState().paths?.platform === "macos"
-            ? "macOS blokuje Simple ADB tools přístup do místní sítě. Povol ho v Nastavení → Soukromí a zabezpečení → Místní síť."
-            : "K telefonu nevede cesta. Zkontroluj, že je ve stejné síti a že spojení neblokuje firewall.",
+          useApp.getState().paths?.platform === "macos" ? tr().wirelessLog.macBlocked : tr().wirelessLog.noRoute,
         );
         break;
       case "refused":
         useWireless.setState({ localNetworkBlocked: false });
         if (verbose)
-          log("error", `Telefon ${host} na portu ${port} neposlouchá. Android 10 a starší: připoj kabel a dej „Přepnout na Wi‑Fi“. Android 11+: zkontroluj port na obrazovce Bezdrátové ladění.`);
+          log("error", tr().wirelessLog.refused(host, port));
         break;
       case "timeout":
-        if (verbose) log("error", `Telefon ${host} neodpovídá. Je zapnutý a ve stejné Wi‑Fi síti jako počítač?`);
+        if (verbose) log("error", tr().wirelessLog.timeout(host));
         break;
     }
     return result;

@@ -57,7 +57,7 @@ jobs:
         working-directory: tauri
         run: npm ci
 
-      - name: Release notes from CHANGELOG.md
+      - name: Release notes from CHANGELOG.md and CHANGELOG.en.md
         id: notes
         shell: bash
         run: |
@@ -89,10 +89,12 @@ jobs:
             ${{ steps.notes.outputs.body }}
 
             ---
-            Instalace APK, logcat, zrcadlení obrazovky, Wi‑Fi ladění a další adb nástroje bez terminálu. Nainstalovaná aplikace se příště aktualizuje sama.
+            APK installs, logcat, screen mirroring, Wi‑Fi debugging and more adb tools without a terminal, in English and Czech. An installed app updates itself next time.
 
-            **Windows:** `*-setup.exe` (doporučeno) nebo `.msi`. Bez placeného certifikátu ukáže SmartScreen varování → Další informace → Přesto spustit.
-            **macOS:** `_aarch64.dmg` pro Apple Silicon (M1 a novější), `_x64.dmg` pro Intel. Appka není notarizovaná → po prvním spuštění Nastavení → Soukromí a zabezpečení → Přesto otevřít.
+            **Windows:** `*-setup.exe` (recommended) or `.msi`. Without a paid certificate SmartScreen warns → More info → Run anyway.
+            **macOS:** `_aarch64.dmg` for Apple Silicon (M1 and newer), `_x64.dmg` for Intel. The app is not notarized → after the first launch System Settings → Privacy & Security → Open Anyway.
+
+            **Česky:** Windows `*-setup.exe` (SmartScreen → Další informace → Přesto spustit), macOS `_aarch64.dmg` pro Apple Silicon a `_x64.dmg` pro Intel (Nastavení → Soukromí a zabezpečení → Přesto otevřít).
           releaseDraft: true
           prerelease: false
 

@@ -8,6 +8,7 @@ use tokio::{
     sync::{Mutex, mpsc, oneshot},
 };
 
+use crate::i18n::tr;
 use crate::toolchain::{Tool, Toolchain};
 
 #[derive(Serialize)]
@@ -47,11 +48,18 @@ pub fn command(program: &Path) -> Command {
 }
 
 async fn prepare(toolchain: &Toolchain, tool: &str) -> Result<Command, String> {
-    let tool = Tool::parse(tool).ok_or_else(|| format!("Neznámý nástroj {tool}"))?;
-    let path = toolchain
-        .path(tool)
-        .await
-        .ok_or_else(|| format!("{} není k dispozici", tool.name()))?;
+    let tool = Tool::parse(tool).ok_or_else(|| {
+        tr(
+            format!("Neznámý nástroj {tool}"),
+            format!("Unknown tool {tool}"),
+        )
+    })?;
+    let path = toolchain.path(tool).await.ok_or_else(|| {
+        tr(
+            format!("{} není k dispozici", tool.name()),
+            format!("{} is not available", tool.name()),
+        )
+    })?;
     let mut cmd = command(&path);
     // scrcpy must talk to the same adb binary, otherwise two adb versions keep killing each other's server.
     if tool == Tool::Scrcpy
@@ -81,7 +89,7 @@ pub async fn run_tool(
                 Err(_) => {
                     return Ok(RunResult {
                         status: -2,
-                        output: "Časový limit vypršel".into(),
+                        output: tr("Časový limit vypršel", "Timed out").into(),
                     });
                 }
             }

@@ -1,4 +1,6 @@
-import raw from "../../../CHANGELOG.md?raw";
+import rawCs from "../../../CHANGELOG.md?raw";
+import rawEn from "../../../CHANGELOG.en.md?raw";
+import type { Lang } from "../i18n";
 
 export interface ChangelogGroup {
   title: string;
@@ -36,8 +38,20 @@ export function parseChangelog(text: string): ChangelogRelease[] {
   return releases;
 }
 
-/** Released versions only; the "Nevydáno" section is work in progress. */
-export const CHANGELOG = parseChangelog(raw).filter((r) => /^\d/.test(r.version));
+const released = (text: string) => parseChangelog(text).filter((r) => /^\d/.test(r.version));
+
+/** Released versions only; the "Nevydáno"/"Unreleased" section is work in progress. */
+export const CHANGELOG: Record<Lang, ChangelogRelease[]> = { cs: released(rawCs), en: released(rawEn) };
+
+/**
+ * Release notes carry both languages: English, then `<!-- cs -->` and Czech, optionally closed by `<!-- end -->`.
+ * Notes without the marker (older releases) are returned whole.
+ */
+export function localizedNotes(notes: string | null | undefined, lang: Lang): string {
+  const text = (notes ?? "").split("<!-- end -->")[0];
+  const [english, czech] = text.split("<!-- cs -->");
+  return czech === undefined ? text : lang === "cs" ? czech : english;
+}
 
 /** Bullet lines of release notes (updater body or GitHub release body). */
 export function noteItems(notes: string | null | undefined): string[] {

@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::{io::AsyncWriteExt, sync::RwLock};
 
+use crate::i18n::tr;
 use crate::proc::command;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -253,7 +254,7 @@ struct Progress {
 
 #[tauri::command]
 pub async fn toolchain_install(app: AppHandle, tool: String) -> Result<(), String> {
-    let tool = Tool::parse(&tool).ok_or("Neznámý nástroj")?;
+    let tool = Tool::parse(&tool).ok_or(tr("Neznámý nástroj", "Unknown tool"))?;
     let dir = managed_dir(&app)?;
     tokio::fs::create_dir_all(&dir)
         .await
@@ -275,7 +276,11 @@ fn client() -> reqwest::Client {
 async fn download(app: &AppHandle, tool: Tool, url: &str, dest: &Path) -> Result<(), String> {
     let response = client().get(url).send().await.map_err(|e| e.to_string())?;
     if !response.status().is_success() {
-        return Err(format!("Server vrátil HTTP {}", response.status().as_u16()));
+        let status = response.status().as_u16();
+        return Err(tr(
+            format!("Server vrátil HTTP {status}"),
+            format!("Server returned HTTP {status}"),
+        ));
     }
     let total = response.content_length().unwrap_or(0);
     let mut file = tokio::fs::File::create(dest)
@@ -334,7 +339,11 @@ async fn install_platform_tools(app: &AppHandle, dir: &Path) -> Result<(), Strin
     let _ = tokio::fs::remove_file(&archive).await;
     result?;
     if !dir.join("platform-tools").join(Tool::Adb.exe()).is_file() {
-        return Err("V archivu platform-tools chybí adb.".into());
+        return Err(tr(
+            "V archivu platform-tools chybí adb.",
+            "The platform-tools archive has no adb.",
+        )
+        .into());
     }
     Ok(())
 }
@@ -366,7 +375,10 @@ async fn install_aapt2(app: &AppHandle, dir: &Path) -> Result<(), String> {
                 && build.chars().all(|c| c.is_ascii_digit())
         })
         .max_by(|a, b| compare_versions(a, b))
-        .ok_or("Nenašel jsem stabilní verzi aapt2.")?
+        .ok_or(tr(
+            "Nenašel jsem stabilní verzi aapt2.",
+            "No stable aapt2 version found.",
+        ))?
         .to_string();
     let classifier = match platform_suffix() {
         "darwin" => "osx",
@@ -384,9 +396,12 @@ async fn install_aapt2(app: &AppHandle, dir: &Path) -> Result<(), String> {
         let file = std::fs::File::open(&archive_clone).map_err(|e| e.to_string())?;
         let mut zip = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
         let name = Tool::Aapt2.exe();
-        let mut entry = zip
-            .by_name(&name)
-            .map_err(|_| format!("V archivu chybí {name}"))?;
+        let mut entry = zip.by_name(&name).map_err(|_| {
+            tr(
+                format!("V archivu chybí {name}"),
+                format!("The archive has no {name}"),
+            )
+        })?;
         let mut bytes = Vec::new();
         entry.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
         let dest = out_dir.join(&name);
@@ -438,7 +453,10 @@ async fn install_scrcpy(app: &AppHandle, dir: &Path) -> Result<(), String> {
         .assets
         .iter()
         .find(|a| a.name.starts_with(prefix) && a.name.ends_with(suffix))
-        .ok_or("V posledním vydání scrcpy chybí build pro tento systém.")?;
+        .ok_or(tr(
+            "V posledním vydání scrcpy chybí build pro tento systém.",
+            "The latest scrcpy release has no build for this system.",
+        ))?;
 
     let archive = dir.join("scrcpy.download");
     download(app, Tool::Scrcpy, &asset.browser_download_url, &archive).await?;
@@ -461,7 +479,11 @@ async fn install_scrcpy(app: &AppHandle, dir: &Path) -> Result<(), String> {
         let actual = hex::encode(Sha256::digest(&bytes));
         if expected.as_deref() != Some(actual.as_str()) {
             let _ = tokio::fs::remove_file(&archive).await;
-            return Err("Kontrolní součet staženého scrcpy nesedí, instalaci jsem zrušil.".into());
+            return Err(tr(
+                "Kontrolní součet staženého scrcpy nesedí, instalaci jsem zrušil.",
+                "The downloaded scrcpy checksum does not match, installation cancelled.",
+            )
+            .into());
         }
     }
 
@@ -480,11 +502,16 @@ async fn install_scrcpy(app: &AppHandle, dir: &Path) -> Result<(), String> {
                 .unpack(&tmp)
                 .map_err(|e| e.to_string())?;
         }
-        let binary =
-            find_file(&tmp, &Tool::Scrcpy.exe()).ok_or("V archivu scrcpy chybí binárka.")?;
+        let binary = find_file(&tmp, &Tool::Scrcpy.exe()).ok_or(tr(
+            "V archivu scrcpy chybí binárka.",
+            "The scrcpy archive has no binary.",
+        ))?;
         let folder = binary
             .parent()
-            .ok_or("Neplatná struktura archivu.")?
+            .ok_or(tr(
+                "Neplatná struktura archivu.",
+                "Invalid archive structure.",
+            ))?
             .to_path_buf();
         let _ = std::fs::remove_dir_all(&target);
         // The binary needs scrcpy-server (and on Windows its DLLs) next to it, so keep the whole folder.

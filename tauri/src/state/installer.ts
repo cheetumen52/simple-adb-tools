@@ -24,6 +24,7 @@ import { load, save } from "../lib/storage";
 import { log } from "./log";
 import { useApp } from "./app";
 import { toolReady, useToolchain } from "./toolchain";
+import { locale, tr } from "../i18n";
 
 export interface DeviceDetails {
   android: string;
@@ -184,7 +185,7 @@ function detectNewApks(all: ApkEntry[]) {
     pendingApks.delete(key);
     seenApks.add(key);
     if (!get().autoInstall) continue;
-    log("info", `Nové APK ${apk.name}, instaluji automaticky`);
+    log("info", tr().installer.newApk(apk.name));
     get().enqueueInstall([apk.path], get().reinstallMode);
   }
 }
@@ -205,10 +206,10 @@ async function waitForTargets(): Promise<Device[] | null> {
   t = targets(get());
   if (t.length) return t;
   if (readyDevices(get()).length) {
-    log("error", "Žádné zařízení není vybrané. Zaškrtni telefon v seznamu.");
+    log("error", tr().installer.noneSelected);
     return null;
   }
-  log("command", "Nevidím telefon, restartuji adb…");
+  log("command", tr().installer.noPhoneRestarting);
   await adb(["kill-server"], 15000);
   await adb(["start-server"], 30000);
   let announced = false;
@@ -220,11 +221,11 @@ async function waitForTargets(): Promise<Device[] | null> {
     if (!announced) {
       announced = true;
       const unauthorized = get().devices.some((d) => d.state === "unauthorized");
-      log("info", unauthorized ? "Potvrď na telefonu „Povolit ladění USB“…" : "Čekám na připojení telefonu (max. 90 s)…");
+      log("info", unauthorized ? tr().installer.confirmUsb : tr().installer.waiting);
     }
     await new Promise((r) => setTimeout(r, 2000));
   }
-  log("error", "Telefon se do 90 s nepřipojil.");
+  log("error", tr().installer.timeout);
   return null;
 }
 
@@ -238,7 +239,7 @@ async function installOne(device: Device, file: string, pkg: string | null, rein
       log("command", `adb uninstall ${pkg} → ${label}`);
       await streamToEnd("adb", ["-s", device.serial, "uninstall", pkg], out);
     } else {
-      log("error", "Bez aapt2 neznám název balíčku, reinstall přeskakuji");
+      log("error", tr().installer.noAapt2Reinstall);
     }
   }
 
@@ -246,7 +247,7 @@ async function installOne(device: Device, file: string, pkg: string | null, rein
   let lastOutput = "";
   for (let i = 0; i < attempts.length; i++) {
     if (i > 0) {
-      log("info", `Zkouším znovu (${i + 1}/${attempts.length})…`);
+      log("info", tr().installer.retrying(i + 1, attempts.length));
       await new Promise((r) => setTimeout(r, i === 2 ? 2000 : 500));
     }
     log("command", `adb ${attempts[i].join(" ")} ${name} → ${label}`);
@@ -254,7 +255,7 @@ async function installOne(device: Device, file: string, pkg: string | null, rein
     if (r.status === 0 && r.output.includes("Success")) {
       log("success", `✓ ${name} → ${label}`);
       if (get().launchAfterInstall && pkg) {
-        log("command", `Spouštím ${pkg} → ${label}`);
+        log("command", `${tr().actions.launch} ${pkg} → ${label}`);
         await adb(["-s", device.serial, "shell", "monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"], 20000);
       }
       return true;
@@ -264,7 +265,7 @@ async function installOne(device: Device, file: string, pkg: string | null, rein
   }
   const hint = { ...parseFailure(lastOutput), file };
   set({ failureHint: hint });
-  log("error", `✗ ${name} → ${label}: ${hint.message}`);
+  log("error", `✗ ${name} → ${label}: ${tr().failures[hint.reason]}`);
   return false;
 }
 
@@ -282,7 +283,7 @@ async function notify(ok: boolean, title: string) {
   try {
     let granted = await isPermissionGranted();
     if (!granted) granted = (await requestPermission()) === "granted";
-    if (granted) sendNotification({ title: ok ? "Nainstalováno ✓" : "Instalace selhala ✗", body: title });
+    if (granted) sendNotification({ title: ok ? tr().installer.notifyOk : tr().installer.notifyFailed, body: title });
   } catch {
     // Notifications are best effort.
   }
@@ -292,11 +293,12 @@ async function runJob(job: Job) {
   const title = job.kind === "install" ? job.files.map(baseName).join(", ") : job.pkg;
   set({ running: true, startedAt: Date.now(), lastResult: null, failureHint: null, currentTitle: title });
   void updateBadge();
-  log("info", job.kind === "install" ? `${job.reinstall ? "Reinstall" : "Instalace"}: ${title}` : `Odinstalace: ${title}`);
+  const m = tr().installer;
+  log("info", `${job.kind === "uninstall" ? m.jobUninstall : job.reinstall ? m.jobReinstall : m.jobInstall}: ${title}`);
 
   let ok = false;
   if (!toolReady("adb")) {
-    log("error", "adb není k dispozici. Doinstaluj ho v Systémových požadavcích.");
+    log("error", tr().installer.adbMissing);
     useApp.getState().setTab("requirements");
   } else {
     const devices = await waitForTargets();
@@ -331,7 +333,7 @@ async function runJob(job: Job) {
   }
 
   set({ running: false, currentTitle: "", startedAt: null, lastResult: ok });
-  log(ok ? "success" : "error", ok ? "Hotovo" : "Selhalo");
+  log(ok ? "success" : "error", ok ? tr().installer.done : tr().installer.failed);
   void updateBadge();
   void notify(ok, title);
   void get().refreshDevices();
@@ -426,7 +428,7 @@ export const useInstaller = create<InstallerState>(() => ({
     log("command", "adb kill-server && adb start-server");
     await adb(["kill-server"], 15000);
     await adb(["start-server"], 30000);
-    log("info", "adb znovu běží");
+    log("info", tr().installer.adbRunning);
     await get().refreshDevices();
   },
 
@@ -438,10 +440,10 @@ export const useInstaller = create<InstallerState>(() => ({
     log("command", `adb exec-out screencap -p → ${displayName(device)}`);
     const r = await native.runToFile("adb", ["-s", device.serial, "exec-out", "screencap", "-p"], path);
     if (r.status !== 0) {
-      log("error", `Screenshot selhal: ${r.output.trim()}`);
+      log("error", tr().installer.screenshotFailed(r.output.trim()));
       return;
     }
-    log("success", `Screenshot uložen na plochu: ${name}`);
+    log("success", tr().installer.screenshotSaved(name));
     void openPath(path);
   },
 
@@ -454,7 +456,7 @@ export const useInstaller = create<InstallerState>(() => ({
   },
 
   addFolder: async () => {
-    const picked = await open({ title: "Sledovat složku s APK", directory: true, multiple: true });
+    const picked = await open({ title: tr().install.addFolderTitle, directory: true, multiple: true });
     const list = Array.isArray(picked) ? picked : picked ? [picked] : [];
     const folders = [...get().watchedFolders];
     for (const p of list) if (!folders.includes(p)) folders.push(p);
@@ -478,7 +480,7 @@ export const useInstaller = create<InstallerState>(() => ({
   enqueueInstall: (files, reinstall) => {
     const apks = files.filter((f) => f.toLowerCase().endsWith(".apk"));
     if (!apks.length) {
-      log("error", "Mezi soubory není žádné .apk");
+      log("error", tr().installer.noApkFiles);
       return;
     }
     useApp.getState().setTab("install");
@@ -493,19 +495,20 @@ export const useInstaller = create<InstallerState>(() => ({
     const last = get().lastInstalled;
     const devices = targets(get());
     if (!last || !devices.length) {
-      if (!devices.length) log("error", "Žádné vybrané zařízení.");
+      if (!devices.length) log("error", tr().installer.noDevice);
       return;
     }
     const q = `'${last.pkg}'`;
     const launch = `monkey -p ${q} -c android.intent.category.LAUNCHER 1`;
-    const commands: Record<AppAction, [string, string]> = {
-      launch: ["Spouštím", launch],
-      restart: ["Restartuji", `am force-stop ${q}; ${launch}`],
-      stop: ["Zastavuji", `am force-stop ${q}`],
-      settings: ["Otevírám nastavení", `am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d 'package:${last.pkg}'`],
-      clearData: ["Mažu data", `pm clear ${q}`],
+    const commands: Record<AppAction, string> = {
+      launch,
+      restart: `am force-stop ${q}; ${launch}`,
+      stop: `am force-stop ${q}`,
+      settings: `am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d 'package:${last.pkg}'`,
+      clearData: `pm clear ${q}`,
     };
-    const [title, command] = commands[action];
+    const title = tr().actions[action];
+    const command = commands[action];
     for (const device of devices) {
       log("command", `${title} ${last.pkg} → ${displayName(device)}`);
       const r = await adb(["-s", device.serial, "shell", command], 30000);
@@ -515,13 +518,14 @@ export const useInstaller = create<InstallerState>(() => ({
   },
 }));
 
+/** Kept in English regardless of the UI language: it is pasted into bug reports. */
 export function diagnostics(): string {
   const tc = useToolchain.getState();
   const describe = (s: (typeof tc)["adb"]) =>
-    s.kind === "found" ? `${s.version} – ${s.path}` : s.kind === "broken" ? `nefunkční (${s.error}) – ${s.path}` : s.kind === "missing" ? "chybí" : "kontroluji";
+    s.kind === "found" ? `${s.version} – ${s.path}` : s.kind === "broken" ? `broken (${s.error}) – ${s.path}` : s.kind === "missing" ? "missing" : "checking";
   const { version, paths } = useApp.getState();
   const lines = [
-    `Simple ADB tools ${version} (${paths?.platform ?? "?"})`,
+    `Simple ADB tools ${version} (${paths?.platform ?? "?"}, UI ${locale()})`,
     `${navigator.userAgent}`,
     `adb: ${describe(tc.adb)}`,
     `aapt2: ${describe(tc.aapt2)}`,
@@ -530,7 +534,7 @@ export function diagnostics(): string {
   const s = get();
   for (const d of s.devices) {
     const det = s.details[d.serial];
-    lines.push(`zařízení: ${displayName(d)} [${d.serial}] ${d.state}${det ? ` · Android ${det.android} · ${det.manufacturer}` : ""}`);
+    lines.push(`device: ${displayName(d)} [${d.serial}] ${d.state}${det ? ` · Android ${det.android} · ${det.manufacturer}` : ""}`);
   }
   return lines.join("\n");
 }

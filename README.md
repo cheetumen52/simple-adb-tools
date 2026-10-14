@@ -5,7 +5,14 @@
 [![CI](https://github.com/cheetumen52/simple-adb-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/cheetumen52/simple-adb-tools/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/cheetumen52/simple-adb-tools)](https://github.com/cheetumen52/simple-adb-tools/releases/latest)
 
-> The app's interface is in Czech.
+## Supported languages
+
+| Language | App | Installer (Windows) | Changelog |
+|---|---|---|---|
+| English | ✅ | ✅ | [CHANGELOG.en.md](CHANGELOG.en.md) |
+| Czech (čeština) | ✅ | ✅ | [CHANGELOG.md](CHANGELOG.md) |
+
+The app follows the system language (Slovak systems get Czech, everything else falls back to English). Switch it any time in **Settings → App language**.
 
 ## Features
 
@@ -15,6 +22,7 @@
 - **Wi‑Fi debugging**: switch a phone to Wi‑Fi in one click, pair Android 11+ devices, and reconnect automatically when the connection drops.
 - **No SDK required**: the app can download adb, aapt2 and scrcpy from their official sources.
 - **Automatic updates**, signed with the project key.
+- **English and Czech**, following the system language or your choice in Settings.
 
 ## Download
 
@@ -66,7 +74,7 @@ A pre-commit hook (`.githooks/pre-commit`) blocks commits that contain private k
 python3 scripts/check-secrets.py --all   # scan every tracked file
 ```
 
-Architecture and the release process are documented in [`docs/`](docs/) (Czech); version history is in [`CHANGELOG.md`](CHANGELOG.md).
+Architecture and the release process are documented in [`docs/`](docs/) (Czech); version history is in [`CHANGELOG.en.md`](CHANGELOG.en.md) (English) and [`CHANGELOG.md`](CHANGELOG.md) (Czech).
 
 ## Contributors
 

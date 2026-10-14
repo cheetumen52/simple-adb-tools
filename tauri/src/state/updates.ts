@@ -4,6 +4,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { BRAND, useApp } from "./app";
 import { log } from "./log";
 import { isOlder, versionParts } from "../lib/version";
+import { tr } from "../i18n";
 
 export type UpdateState =
   | { kind: "idle" }
@@ -32,9 +33,9 @@ async function checkReleases(): Promise<UpdateState> {
   const res = await fetch(`https://api.github.com/repos/${BRAND.repo}/releases?per_page=30`, {
     headers: { Accept: "application/vnd.github+json" },
   });
-  if (res.status === 404) return { kind: "failed", reason: "Repozitář není veřejný, aktualizace nejde ověřit." };
-  if (res.status === 403 || res.status === 429) return { kind: "failed", reason: "GitHub dočasně omezil počet dotazů, zkusím to později." };
-  if (!res.ok) return { kind: "failed", reason: `GitHub vrátil HTTP ${res.status}.` };
+  if (res.status === 404) return { kind: "failed", reason: tr().updates.repoPrivate };
+  if (res.status === 403 || res.status === 429) return { kind: "failed", reason: tr().updates.rateLimited };
+  if (!res.ok) return { kind: "failed", reason: tr().updates.httpError(res.status) };
   // Published releases only: a bare tag (or a draft) has no downloadable installers yet.
   const releases = ((await res.json()) as { tag_name: string; html_url: string; draft: boolean; body: string | null }[]).filter(
     (r) => !r.draft && versionParts(r.tag_name),
@@ -72,7 +73,7 @@ export const useUpdates = create<UpdatesStore>((set, get) => ({
     try {
       set({ state: await checkReleases(), lastChecked: new Date() });
     } catch (e) {
-      set({ state: { kind: "failed", reason: `Nepodařilo se spojit s GitHubem: ${String(e)}` } });
+      set({ state: { kind: "failed", reason: tr().updates.connectFailed(String(e)) } });
     }
   },
 
@@ -83,7 +84,7 @@ export const useUpdates = create<UpdatesStore>((set, get) => ({
     let total = 0;
     let downloaded = 0;
     set({ state: { kind: "installing", tag, progress: null } });
-    log("info", `Stahuji aktualizaci ${tag}…`);
+    log("info", tr().updates.downloading(tag));
     try {
       await pending.downloadAndInstall((event) => {
         if (event.event === "Started") total = event.data.contentLength ?? 0;
@@ -93,10 +94,10 @@ export const useUpdates = create<UpdatesStore>((set, get) => ({
         }
       });
       // Windows exits for the installer and restarts by itself; macOS swaps the bundle and needs a relaunch.
-      log("success", `✓ Aktualizace ${tag} nainstalována, restartuji…`);
+      log("success", tr().updates.installed(tag));
       await relaunch();
     } catch (e) {
-      log("error", `Aktualizace selhala: ${String(e)}`);
+      log("error", tr().updates.failed(String(e)));
       set({ state: { kind: "available", tag, url: releaseUrl(tag), autoInstall: false, notes } });
     }
   },

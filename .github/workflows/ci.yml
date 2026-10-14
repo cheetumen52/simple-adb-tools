@@ -34,7 +34,7 @@ jobs:
       - run: npx vite build
       - name: Secret scan (bundled frontend)
         run: python3 ../scripts/check-secrets.py --path dist
-      - name: CHANGELOG.md covers the app version
+      - name: Both changelogs cover the app version
         working-directory: .
         run: python3 scripts/release-notes.py "v$(node -p "require('./tauri/package.json').version")" > /dev/null
 

@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { native, type ToolName, type ToolStatus } from "../lib/native";
 import { load, save } from "../lib/storage";
+import { tr } from "../i18n";
 
 interface ToolchainState {
   adb: ToolStatus;
@@ -51,7 +52,7 @@ export const useToolchain = create<ToolchainState>((set, get) => ({
     }
   },
   chooseAdb: async () => {
-    const path = await open({ title: "Vyber binárku adb", multiple: false, directory: false });
+    const path = await open({ title: tr().requirements.chooseAdbTitle, multiple: false, directory: false });
     if (typeof path !== "string") return;
     save("customAdbPath", path);
     await get().check();

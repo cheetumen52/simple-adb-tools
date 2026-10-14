@@ -6,7 +6,7 @@ Vydání se dělá jen se souhlasem vlastníka projektu.
 
 1. Všechno určené k vydání je sloučené v `main` a CI je zelené.
 2. Zvol číslo verze podle [SemVer](https://semver.org/lang/cs/): oprava → patch, nová funkce → minor.
-3. V `CHANGELOG.md` přejmenuj `## [Nevydáno]` na `## [X.Y.Z] - RRRR-MM-DD` a nad něj přidej prázdnou sekci `## [Nevydáno]`.
+3. V `CHANGELOG.md` přejmenuj `## [Nevydáno]` na `## [X.Y.Z] - RRRR-MM-DD` a nad něj přidej prázdnou sekci `## [Nevydáno]`. Totéž v `CHANGELOG.en.md` s `## [Unreleased]`.
 4. Zvyš verzi na třech místech:
    - `tauri/package.json` (a `package-lock.json` přes `npm install --package-lock-only`)
    - `tauri/src-tauri/Cargo.toml` (`Cargo.lock` se aktualizuje sám při buildu nebo `cargo check`)
@@ -16,7 +16,7 @@ Vydání se dělá jen se souhlasem vlastníka projektu.
    - spustí CI;
    - ověří, že tag odpovídá verzi v `package.json`;
    - sestaví Windows (NSIS, MSI) a macOS (Apple Silicon, Intel) a podepíše balíčky pro updater;
-   - založí **návrh** vydání s textem z `CHANGELOG.md`;
+   - založí **návrh** vydání s anglickým i českým textem z changelogů (`scripts/release-notes.py`);
    - poskládá `latest.json` pro updater.
 7. Zkontroluj návrh vydání (soubory `*-setup.exe`, `*.msi`, `*_aarch64.dmg`, `*_x64.dmg`, `*.app.tar.gz`, `*.sig`, `latest.json`) a zveřejni ho jako *Latest*.
 

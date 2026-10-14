@@ -1,4 +1,5 @@
 mod files;
+mod i18n;
 mod net;
 mod proc;
 mod toolchain;
@@ -71,6 +72,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             take_pending_files,
+            i18n::set_locale,
             toolchain::toolchain_check,
             toolchain::toolchain_install,
             proc::run_tool,
