@@ -5,6 +5,7 @@ import { ArrowDownCircle, BadgeCheck, Coffee, HelpCircle, RefreshCw, Sparkles, S
 import { BRAND, tabNumber, useApp } from "../state/app";
 import { useUpdates } from "../state/updates";
 import { diagnostics } from "../state/installer";
+import { CHANGELOG, noteItems, type ChangelogRelease } from "../lib/changelog";
 import { BrandMark, Button, Card, Kicker, SectionHeader, Spinner } from "../components/ui";
 
 function useFlash(): [boolean, () => void] {
@@ -13,24 +14,26 @@ function useFlash(): [boolean, () => void] {
 }
 
 function UpdateCard() {
-  const { state, lastChecked, check } = useUpdates();
+  const { state, lastChecked, check, install } = useUpdates();
   const version = useApp((s) => s.version);
   const checked = lastChecked ? `Naposledy ověřeno ${lastChecked.toLocaleTimeString("cs", { hour: "2-digit", minute: "2-digit" })}` : null;
   const title =
     state.kind === "checking" ? "Hledám novou verzi…"
     : state.kind === "upToDate" ? `Máš nejnovější verzi ${version}`
     : state.kind === "available" ? `K dispozici je verze ${state.tag}`
+    : state.kind === "installing" ? `Instaluji verzi ${state.tag}…`
     : state.kind === "failed" ? "Aktualizace se nepodařilo ověřit"
     : `Verze ${version}`;
   const subtitle =
     state.kind === "failed" ? state.reason
-    : state.kind === "available" ? `Nainstalováno ${version}. ${checked ?? ""}`
+    : state.kind === "available" ? (state.autoInstall ? `Nainstalováno ${version}. Stáhnu ji, ověřím podpis a appku restartuji.` : `Nainstalováno ${version}. ${checked ?? ""}`)
+    : state.kind === "installing" ? (state.progress != null ? `Staženo ${Math.round(state.progress * 100)} %` : "Připravuji stažení…")
     : checked ?? `Kontroluji vydání v repozitáři ${BRAND.repo} na GitHubu.`;
   return (
-    <Card highlight={state.kind === "available"}>
+    <Card highlight={state.kind === "available" || state.kind === "installing"}>
       <div className="row" style={{ gap: 14 }}>
         <div style={{ width: 26, display: "flex", justifyContent: "center" }}>
-          {state.kind === "checking" ? <Spinner />
+          {state.kind === "checking" || state.kind === "installing" ? <Spinner />
             : state.kind === "available" ? <Sparkles size={20} color="var(--accent)" />
             : state.kind === "upToDate" ? <BadgeCheck size={20} color="var(--light-cyan)" />
             : <HelpCircle size={20} color="var(--text-muted)" />}
@@ -40,10 +43,56 @@ function UpdateCard() {
           <span className="title-sm">{title}</span>
           <span className="caption">{subtitle}</span>
         </div>
-        {state.kind === "available" && (
+        {state.kind === "available" && state.autoInstall && (
+          <Button variant="primary" small icon={<ArrowDownCircle size={13} />} onClick={() => void install()}>Aktualizovat a restartovat</Button>
+        )}
+        {state.kind === "available" && !state.autoInstall && (
           <Button variant="primary" small icon={<ArrowDownCircle size={13} />} onClick={() => void openUrl(state.url)}>Stáhnout {state.tag}</Button>
         )}
-        <Button small icon={<RefreshCw size={13} />} disabled={state.kind === "checking"} onClick={() => void check()}>Zkontrolovat</Button>
+        {state.kind === "installing" && state.progress != null && <span className="mono c-accent">{Math.round(state.progress * 100)} %</span>}
+        <Button small icon={<RefreshCw size={13} />} disabled={state.kind === "checking" || state.kind === "installing"} onClick={() => void check()}>Zkontrolovat</Button>
+      </div>
+      {state.kind === "available" && noteItems(state.notes).length > 0 && (
+        <ul className="notes">
+          {noteItems(state.notes).map((item, i) => <li key={i}>{item}</li>)}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function ReleaseNotes({ release }: { release: ChangelogRelease }) {
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      {release.groups.map((g) => (
+        <div key={g.title} className="stack" style={{ gap: 4 }}>
+          <span className="kicker muted" style={{ letterSpacing: "0.12em" }}>{g.title}</span>
+          <ul className="notes">{g.items.map((item, i) => <li key={i}>{item}</li>)}</ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChangelogCard() {
+  const version = useApp((s) => s.version);
+  if (!CHANGELOG.length) return null;
+  const current = CHANGELOG.find((r) => r.version === version) ?? CHANGELOG[0];
+  const older = CHANGELOG.filter((r) => r !== current);
+  return (
+    <Card>
+      <div className="stack" style={{ gap: 12 }}>
+        <div className="stack" style={{ gap: 3 }}>
+          <Kicker muted>co je nového</Kicker>
+          <span className="title-sm">Verze {current.version}{current.date ? ` · ${current.date}` : ""}</span>
+        </div>
+        <ReleaseNotes release={current} />
+        {older.map((r) => (
+          <details key={r.version} className="release-details">
+            <summary>Verze {r.version}{r.date ? ` · ${r.date}` : ""}</summary>
+            <ReleaseNotes release={r} />
+          </details>
+        ))}
       </div>
     </Card>
   );
@@ -69,6 +118,7 @@ export function SupportView() {
           lede="Simple ADB tools jsou zdarma. Bez reklam, bez sledování, bez předplatného. Jestli ti ušetřily pár minut s adb, můžeš mi poslat na kafe."
         />
         <UpdateCard />
+        <ChangelogCard />
         <Card highlight style={{ padding: 22 }}>
           <div className="row" style={{ gap: 26 }}>
             <div style={{ background: "#fff", borderRadius: 14, padding: 12, boxShadow: "0 0 40px rgba(1,181,213,0.25)" }}>

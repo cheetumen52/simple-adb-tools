@@ -252,6 +252,7 @@ select.field { font-family: var(--font); font-size: 12px; cursor: pointer; }
 .progress { height: 4px; border-radius: 4px; background: var(--hairline-strong); overflow: hidden; flex: 1; }
 .progress > div { height: 100%; background: var(--accent); transition: width 0.2s; }
 
+.spin { animation: spin 0.8s linear infinite; }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--hairline-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -309,6 +310,11 @@ select.field { font-family: var(--font); font-size: 12px; cursor: pointer; }
 .menu-label { padding: 6px 10px 4px; }
 .menu-sep { height: 1px; background: var(--hairline); margin: 4px 0; }
 
+.notes { margin: 0; padding-left: 18px; color: var(--text-secondary); font-size: 12.5px; line-height: 1.55; user-select: text; }
+.notes li::marker { color: var(--accent); }
+.release-details summary { cursor: pointer; color: var(--text-secondary); font-size: 12.5px; padding: 4px 0; }
+.release-details summary:hover { color: var(--text-light); }
+.release-details[open] summary { margin-bottom: 8px; }
 .pkg-item { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 8px; border: none; border-radius: 6px; background: none; color: var(--text-secondary); font-family: var(--font-mono); font-size: 11.5px; text-align: left; cursor: pointer; }
 .pkg-item:hover { background: var(--hairline); }
 .pkg-item.active { background: rgba(1, 181, 213, 0.15); color: var(--text-light); }

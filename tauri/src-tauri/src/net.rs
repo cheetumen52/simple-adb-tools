@@ -11,7 +11,9 @@ pub async fn probe_tcp(host: String, port: u16, timeout_ms: Option<u64>) -> Stri
         Ok(Ok(_)) => "reachable",
         Ok(Err(e)) => match e.kind() {
             ErrorKind::ConnectionRefused => "refused",
-            ErrorKind::HostUnreachable | ErrorKind::NetworkUnreachable | ErrorKind::NetworkDown => "blocked",
+            ErrorKind::HostUnreachable | ErrorKind::NetworkUnreachable | ErrorKind::NetworkDown => {
+                "blocked"
+            }
             ErrorKind::TimedOut => "timeout",
             _ => match e.raw_os_error() {
                 // EHOSTUNREACH / ENETUNREACH / ENETDOWN on macOS, WSAE* equivalents on Windows.
@@ -23,4 +25,31 @@ pub async fn probe_tcp(host: String, port: u16, timeout_ms: Option<u64>) -> Stri
         Err(_) => "timeout",
     }
     .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::probe_tcp;
+
+    #[tokio::test]
+    async fn reachable_and_refused() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let open = listener.local_addr().unwrap().port();
+        assert_eq!(
+            probe_tcp("127.0.0.1".into(), open, Some(2000)).await,
+            "reachable"
+        );
+
+        // Bind and drop to get a closed port. Windows retries SYN before reporting the refusal (~2 s).
+        let closed = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        assert_eq!(
+            probe_tcp("127.0.0.1".into(), closed, Some(6000)).await,
+            "refused"
+        );
+    }
 }

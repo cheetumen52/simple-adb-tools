@@ -28,5 +28,7 @@ export default defineConfig(() => ({
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
+    // CHANGELOG.md lives in the repo root and is bundled into the Support tab.
+    fs: { allow: [".."] },
   },
 }));

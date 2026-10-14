@@ -65,6 +65,8 @@ interface InstallerState {
 
   start: () => Promise<void>;
   refreshDevices: () => Promise<void>;
+  manualRefreshing: boolean;
+  manualRefresh: () => Promise<void>;
   applyDevices: (devices: Device[]) => void;
   toggleSelected: (serial: string) => void;
   restartAdb: () => Promise<void>;
@@ -380,6 +382,15 @@ export const useInstaller = create<InstallerState>(() => ({
     timer ??= window.setInterval(() => void tick(), 2500);
     // Resolve after the first device scan so queued "Open with" files see the connected phones.
     await tick();
+  },
+
+  manualRefreshing: false,
+  /** F5 / "Obnovit": rescans devices and APKs and keeps the spinner up long enough to be noticed. */
+  manualRefresh: async () => {
+    if (get().manualRefreshing) return;
+    set({ manualRefreshing: true });
+    await Promise.all([get().refreshDevices(), get().scanApks(), new Promise((r) => setTimeout(r, 450))]);
+    set({ manualRefreshing: false });
   },
 
   refreshDevices: async () => {

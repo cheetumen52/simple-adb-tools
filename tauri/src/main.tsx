@@ -6,13 +6,8 @@ import "@fontsource-variable/jetbrains-mono";
 import "./styles.css";
 import App from "./App";
 
-async function boot() {
-  if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) await import("./dev/mock");
-  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
-  );
-}
-
-void boot();
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);

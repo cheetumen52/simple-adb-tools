@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { recentDevice, useRecentApps, type RecentAction } from "../state/recentApps";
 import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
 import { AlignLeft, Eraser, Play, RefreshCcw, Settings, Square, Trash2 } from "lucide-react";
 import { useToolset } from "../state/toolset";
@@ -56,7 +57,7 @@ function DeviceRow({ device }: { device: Device }) {
 }
 
 function DevicesSection() {
-  const { devices, running, restartAdb, refreshDevices } = useInstaller();
+  const { devices, running, restartAdb, manualRefresh, manualRefreshing } = useInstaller();
   useWireless((s) => s.states);
   const adbReady = useToolchain((s) => s.adb.kind === "found");
   const setTab = useApp((s) => s.setTab);
@@ -66,7 +67,7 @@ function DevicesSection() {
       <div className="row">
         <Kicker muted>zařízení</Kicker>
         <div className="spacer" />
-        <Button small icon={<RefreshCw size={13} />} disabled={!adbReady} onClick={() => void refreshDevices()} title="Znovu načíst seznam zařízení">Obnovit</Button>
+        <Button small icon={<RefreshCw size={13} className={manualRefreshing ? "spin" : undefined} />} disabled={!adbReady} onClick={() => void manualRefresh()} title="Znovu načíst zařízení a APK (F5)">Obnovit</Button>
         <Button small icon={<RotateCw size={13} />} disabled={running || !adbReady} onClick={() => void restartAdb()}>Restartovat adb</Button>
       </div>
       {!adbReady ? (
@@ -233,7 +234,7 @@ function ApkSection() {
   return (
     <div className="stack" style={{ gap: 10 }}>
       <div className="row">
-        <Kicker muted>poslední apk</Kicker>
+        <Kicker muted>nalezené apk ve složce</Kicker>
         <div className="spacer" />
         <Menu label={<span className="row" style={{ gap: 6 }}><Folder size={13} /> Složky ({watchedFolders.length})</span>}>
           {(close) => (
@@ -256,6 +257,84 @@ function ApkSection() {
       ) : (
         <div className="list">
           {apks.map((apk, i) => <ApkRow key={apkKey(apk)} apk={apk} newest={i === 0} onConfirm={setConfirm} />)}
+        </div>
+      )}
+      <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+function RecentAppsSection() {
+  const recent = useRecentApps();
+  const all = useInstaller((s) => s.devices);
+  const selected = useInstaller((s) => s.selected);
+  const setTab = useApp((a) => a.setTab);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const ready = all.filter(isReady);
+  const device = recentDevice(recent.serial);
+  const serial = device?.serial ?? null;
+
+  useEffect(() => {
+    if (serial && recent.loadedFor !== serial) void useRecentApps.getState().load();
+  }, [serial, selected.join(",")]);
+
+  const openLogcat = (pkg: string) => {
+    const toolset = useToolset.getState();
+    if (toolset.logcatRunning) toolset.stopLogcat();
+    toolset.set({ logcatPackage: pkg, section: "logcat", serial });
+    setTab("toolset");
+    window.setTimeout(() => void useToolset.getState().startLogcat(), 300);
+  };
+  const ask = (pkg: string, action: RecentAction) =>
+    setConfirm(
+      action === "clearData"
+        ? { title: `Vymazat data aplikace ${pkg}?`, message: "Smaže se přihlášení, nastavení, cache i uložené soubory aplikace. Tohle nejde vrátit.", confirm: "Vymazat data", action: () => void recent.action(pkg, action) }
+        : { title: `Odinstalovat ${pkg}?`, message: `Aplikace i její data zmizí z ${device ? displayName(device) : "zařízení"}.`, confirm: "Odinstalovat", action: () => void recent.action(pkg, action) },
+    );
+
+  if (!ready.length) return null;
+  return (
+    <div className="stack" style={{ gap: 10 }}>
+      <div className="row">
+        <Kicker muted>poslední apk v zařízení</Kicker>
+        <div className="spacer" />
+        {ready.length > 1 && (
+          <select className="field" style={{ width: 190 }} value={serial ?? ""} onChange={(e) => recent.setSerial(e.target.value)}>
+            {ready.map((d) => <option key={d.serial} value={d.serial}>{displayName(d)}</option>)}
+          </select>
+        )}
+        <Button small icon={<RefreshCw size={13} className={recent.loading ? "spin" : undefined} />} onClick={() => void recent.load()} title="Znovu načíst aplikace ze zařízení" />
+      </div>
+      {!recent.apps.length ? (
+        <Card><span className="caption">{recent.loading ? "Načítám aplikace ze zařízení…" : "V zařízení nejsou žádné nainstalované aplikace."}</span></Card>
+      ) : (
+        <div className="list">
+          {recent.apps.map((app) => (
+            <div key={app.pkg} className="list-row">
+              <Package size={16} color="var(--text-muted)" />
+              <div className="stack" style={{ gap: 3, flex: 1, minWidth: 0 }}>
+                <span className="mono truncate selectable" style={{ color: "var(--text-light)" }}>{app.pkg}</span>
+                <span className="mono-sm c-muted truncate">
+                  {app.versionName}  ·  {app.lastUpdate === app.firstInstall ? "nainstalováno" : "aktualizováno"} {app.lastUpdate ? timeAgo(app.lastUpdate) : "?"}
+                </span>
+              </div>
+              <Button small icon={<Play size={13} />} onClick={() => void recent.action(app.pkg, "launch")}>Spustit</Button>
+              <Menu label={<MoreHorizontal size={16} color="var(--text-muted)" />}>
+                {(close) => (
+                  <>
+                    <button className="menu-item" onClick={() => { close(); void recent.action(app.pkg, "restart"); }}>Restartovat</button>
+                    <button className="menu-item" onClick={() => { close(); void recent.action(app.pkg, "stop"); }}>Zastavit</button>
+                    <button className="menu-item" onClick={() => { close(); openLogcat(app.pkg); }}>Logcat</button>
+                    <button className="menu-item" onClick={() => { close(); void recent.action(app.pkg, "settings"); }}>Nastavení v telefonu</button>
+                    <button className="menu-item" onClick={() => { close(); void navigator.clipboard.writeText(app.pkg); }}>Kopírovat název balíčku</button>
+                    <div className="menu-sep" />
+                    <button className="menu-item c-danger" onClick={() => { close(); ask(app.pkg, "clearData"); }}>Vymazat data</button>
+                    <button className="menu-item c-danger" onClick={() => { close(); ask(app.pkg, "uninstall"); }}>Odinstalovat</button>
+                  </>
+                )}
+              </Menu>
+            </div>
+          ))}
         </div>
       )}
       <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
@@ -344,8 +423,9 @@ export function InstallView() {
             <Switch label="Automaticky instalovat nová APK" title="Jakmile se ve sledované složce objeví nové APK, rovnou ho nainstaluje." checked={autoInstall} onChange={(v) => setOption("autoInstall", v)} />
           </div>
           <FailureBanner />
-          <ApkSection />
           <LastAppSection />
+          <ApkSection />
+          <RecentAppsSection />
         </div>
       </div>
       <LogPanel />

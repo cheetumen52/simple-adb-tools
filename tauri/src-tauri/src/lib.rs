@@ -12,14 +12,20 @@ use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
 struct PendingFiles(Mutex<Vec<String>>);
 
 fn apk_paths(args: impl IntoIterator<Item = String>) -> Vec<String> {
-    args.into_iter().filter(|a| a.to_lowercase().ends_with(".apk")).collect()
+    args.into_iter()
+        .filter(|a| a.to_lowercase().ends_with(".apk"))
+        .collect()
 }
 
 fn deliver(app: &AppHandle, files: Vec<String>) {
     if files.is_empty() {
         return;
     }
-    app.state::<PendingFiles>().0.lock().expect("pending files").extend(files);
+    app.state::<PendingFiles>()
+        .0
+        .lock()
+        .expect("pending files")
+        .extend(files);
     let _ = app.emit("open-files", ());
 }
 
@@ -42,6 +48,9 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }));
+        builder = builder
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_process::init());
     }
 
     builder
@@ -53,7 +62,11 @@ pub fn run() {
         .manage(PendingFiles::default())
         .setup(|app| {
             let files = apk_paths(std::env::args().skip(1));
-            app.state::<PendingFiles>().0.lock().expect("pending files").extend(files);
+            app.state::<PendingFiles>()
+                .0
+                .lock()
+                .expect("pending files")
+                .extend(files);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -88,4 +101,24 @@ pub fn run() {
             }
             _ => {}
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::apk_paths;
+
+    #[test]
+    fn only_apk_arguments_are_taken() {
+        let args = [
+            "--flag",
+            "C:\\Users\\z\\Downloads\\app-debug (1).APK",
+            "/tmp/readme.txt",
+            "/tmp/x.apk",
+        ]
+        .map(String::from);
+        assert_eq!(
+            apk_paths(args),
+            ["C:\\Users\\z\\Downloads\\app-debug (1).APK", "/tmp/x.apk"]
+        );
+    }
 }
