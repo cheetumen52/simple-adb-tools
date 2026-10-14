@@ -25,7 +25,7 @@ function UpdateCard() {
   const subtitle =
     state.kind === "failed" ? state.reason
     : state.kind === "available" ? `Nainstalováno ${version}. ${checked ?? ""}`
-    : checked ?? `Kontroluji tagy v repozitáři ${BRAND.repo} na GitHubu.`;
+    : checked ?? `Kontroluji vydání v repozitáři ${BRAND.repo} na GitHubu.`;
   return (
     <Card highlight={state.kind === "available"}>
       <div className="row" style={{ gap: 14 }}>

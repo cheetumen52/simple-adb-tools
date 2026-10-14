@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
+import { AlignLeft, Eraser, Play, RefreshCcw, Settings, Square, Trash2 } from "lucide-react";
+import { useToolset } from "../state/toolset";
 import { Cable, Camera, Folder, Monitor, MonitorSmartphone, MonitorX, MoreHorizontal, OctagonX, Package, RefreshCw, RotateCw, Smartphone, Wifi, WifiOff, Wrench, X } from "lucide-react";
 import { apkVersion, displayName, isEmulator, isReady, isWireless, type Device } from "../lib/parse";
 import { bytes, timeAgo } from "../lib/format";
@@ -261,6 +263,67 @@ function ApkSection() {
   );
 }
 
+function LastAppSection() {
+  const s = useInstaller();
+  const setTab = useApp((a) => a.setTab);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const last = s.lastInstalled;
+  const allowed = targets(s).length > 0;
+
+  const openLogcat = () => {
+    if (!last) return;
+    const toolset = useToolset.getState();
+    if (toolset.logcatRunning) toolset.stopLogcat();
+    toolset.set({ logcatPackage: last.pkg, section: "logcat" });
+    setTab("toolset");
+    window.setTimeout(() => void useToolset.getState().startLogcat(), 300);
+  };
+
+  return (
+    <div className="stack" style={{ gap: 10 }}>
+      <Kicker muted>poslední nainstalovaná aplikace</Kicker>
+      {!last ? (
+        <Card><span className="caption">Po první instalaci tu najdeš rychlé ovládání aplikace: spuštění, restart, logcat a další.</span></Card>
+      ) : (
+        <Card>
+          <div className="stack" style={{ gap: 12 }}>
+            <div className="row top">
+              <Package size={18} color="var(--accent)" />
+              <div className="stack" style={{ gap: 3, flex: 1, minWidth: 0 }}>
+                <span className="title-sm">{last.label ?? last.pkg}</span>
+                <span className="mono-sm c-muted truncate selectable">
+                  {last.pkg}  ·  {last.version}  ·  {timeAgo(last.at)}  ·  {last.devices.join(", ")}
+                </span>
+              </div>
+              {!allowed && <Pill color="var(--warn)" dot={false}>vyber zařízení</Pill>}
+            </div>
+            <div className="row wrap">
+              <Button variant="primary" small icon={<Play size={13} />} disabled={!allowed} onClick={() => void s.appAction("launch")}>Spustit</Button>
+              <Button small icon={<RefreshCcw size={13} />} disabled={!allowed} onClick={() => void s.appAction("restart")}>Restartovat</Button>
+              <Button small icon={<Square size={13} />} disabled={!allowed} onClick={() => void s.appAction("stop")}>Zastavit</Button>
+              <Button small icon={<AlignLeft size={13} />} disabled={!allowed} onClick={openLogcat}>Logcat</Button>
+              <Button small icon={<Settings size={13} />} disabled={!allowed} onClick={() => void s.appAction("settings")}>Nastavení</Button>
+              <Button small icon={<Eraser size={13} />} disabled={!allowed} onClick={() => setConfirm({
+                title: `Vymazat data aplikace ${last.label ?? last.pkg}?`,
+                message: "Smaže se přihlášení, nastavení, cache i uložené soubory aplikace na vybraných zařízeních. Tohle nejde vrátit.",
+                confirm: "Vymazat data",
+                action: () => void s.appAction("clearData"),
+              })}>Vymazat data</Button>
+              <Button small icon={<Trash2 size={13} />} disabled={!allowed} onClick={() => setConfirm({
+                title: `Odinstalovat ${last.label ?? last.pkg}?`,
+                message: "Aplikace i její data zmizí z vybraných zařízení.",
+                confirm: "Odinstalovat",
+                action: () => s.enqueueUninstall(last.pkg),
+              })}>Odinstalovat</Button>
+            </div>
+          </div>
+        </Card>
+      )}
+      <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
+    </div>
+  );
+}
+
 export function InstallView() {
   const { reinstallMode, launchAfterInstall, autoInstall, setOption } = useInstaller();
   return (
@@ -282,6 +345,7 @@ export function InstallView() {
           </div>
           <FailureBanner />
           <ApkSection />
+          <LastAppSection />
         </div>
       </div>
       <LogPanel />

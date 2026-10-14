@@ -80,6 +80,14 @@ if (new URLSearchParams(location.search).has("update")) {
   const realFetch = window.fetch.bind(window);
   window.fetch = (input, init) =>
     String(input).includes("api.github.com")
-      ? Promise.resolve(new Response(JSON.stringify([{ name: "v1.2.0" }, { name: "v1.1.1" }]), { status: 200 }))
+      ? Promise.resolve(
+          new Response(
+            JSON.stringify([
+              { tag_name: "v1.3.0", html_url: "https://github.com/x/y/releases/tag/v1.3.0", draft: true },
+              { tag_name: "v1.2.0", html_url: "https://github.com/x/y/releases/tag/v1.2.0", draft: false },
+            ]),
+            { status: 200 },
+          ),
+        )
       : realFetch(input, init);
 }

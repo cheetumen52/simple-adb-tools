@@ -10,15 +10,23 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
+        # Apple Silicon and Intel build in parallel instead of one sequential universal build.
         include:
           - platform: macos-latest
-            args: --target universal-apple-darwin
-            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: --target aarch64-apple-darwin
+            rust-targets: aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+            rust-targets: x86_64-apple-darwin
           - platform: windows-latest
             args: ""
             rust-targets: ""
@@ -39,6 +47,7 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: tauri/src-tauri -> target
+          key: ${{ matrix.rust-targets || 'native' }}
 
       - name: Install frontend dependencies
         working-directory: tauri
@@ -56,7 +65,7 @@ jobs:
             Instalace APK, logcat, zrcadlení obrazovky, Wi‑Fi ladění a další adb nástroje bez terminálu.
 
             **Windows:** `*-setup.exe` (doporučeno) nebo `.msi`. Bez placeného certifikátu ukáže SmartScreen varování → Další informace → Přesto spustit.
-            **macOS:** `.dmg` (Apple Silicon i Intel). Appka není notarizovaná → po prvním spuštění Nastavení → Soukromí a zabezpečení → Přesto otevřít.
+            **macOS:** `_aarch64.dmg` pro Apple Silicon (M1 a novější), `_x64.dmg` pro Intel. Appka není notarizovaná → po prvním spuštění Nastavení → Soukromí a zabezpečení → Přesto otevřít.
           releaseDraft: true
           prerelease: false
 
@@ -64,7 +73,7 @@ jobs:
         if: github.ref_type != 'tag'
         uses: actions/upload-artifact@v4
         with:
-          name: simple-adb-tools-${{ matrix.platform }}
+          name: simple-adb-tools-${{ matrix.platform }}-${{ matrix.rust-targets || 'x64' }}
           path: |
             tauri/src-tauri/target/**/release/bundle/nsis/*.exe
             tauri/src-tauri/target/**/release/bundle/msi/*.msi

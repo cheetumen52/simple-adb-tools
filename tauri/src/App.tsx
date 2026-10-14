@@ -91,6 +91,13 @@ export default function App() {
   useEffect(() => {
     void startup();
     const onKey = (e: KeyboardEvent) => {
+      // F5 would reload the webview and wipe all state; make it refresh devices and APKs instead.
+      if (e.key === "F5") {
+        e.preventDefault();
+        void useInstaller.getState().refreshDevices();
+        void useInstaller.getState().scanApks();
+        return;
+      }
       if (!(e.metaKey || e.ctrlKey)) return;
       const n = Number(e.key);
       if (n >= 1 && n <= TABS.length) {
@@ -102,8 +109,18 @@ export default function App() {
         else void useInstaller.getState().restartAdb();
       }
     };
+    // The browser context menu offers "Reload"; keep it only where it helps (text fields, selected text).
+    const onContextMenu = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const editable = target.closest("input, textarea");
+      if (!editable && !window.getSelection()?.toString()) e.preventDefault();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("contextmenu", onContextMenu);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("contextmenu", onContextMenu);
+    };
   }, []);
 
   return (

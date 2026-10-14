@@ -46,18 +46,21 @@ export const useUpdates = create<UpdatesStore>((set, get) => ({
     if (get().state.kind === "checking") return;
     set({ state: { kind: "checking" } });
     try {
-      const res = await fetch(`https://api.github.com/repos/${BRAND.repo}/tags?per_page=100`, {
+      // Published releases only: a bare tag (or a draft) has no downloadable installers yet.
+      const res = await fetch(`https://api.github.com/repos/${BRAND.repo}/releases?per_page=30`, {
         headers: { Accept: "application/vnd.github+json" },
       });
       if (res.status === 404) return set({ state: { kind: "failed", reason: "Repozitář zatím není veřejný. Kontrola začne fungovat po jeho zveřejnění." } });
       if (res.status === 403 || res.status === 429) return set({ state: { kind: "failed", reason: "GitHub dočasně omezil počet dotazů, zkusím to později." } });
       if (!res.ok) return set({ state: { kind: "failed", reason: `GitHub vrátil HTTP ${res.status}.` } });
-      const tags = ((await res.json()) as { name: string }[]).map((t) => t.name).filter((t) => versionParts(t));
+      const releases = ((await res.json()) as { tag_name: string; html_url: string; draft: boolean }[]).filter(
+        (r) => !r.draft && versionParts(r.tag_name),
+      );
       set({ lastChecked: new Date() });
-      const newest = tags.reduce<string | null>((best, t) => (!best || isOlder(best, t) ? t : best), null);
+      const newest = releases.reduce<(typeof releases)[number] | null>((best, r) => (!best || isOlder(best.tag_name, r.tag_name) ? r : best), null);
       const current = useApp.getState().version;
-      if (newest && isOlder(current, newest)) {
-        set({ state: { kind: "available", tag: newest, url: `https://github.com/${BRAND.repo}/releases/tag/${newest}` } });
+      if (newest && isOlder(current, newest.tag_name)) {
+        set({ state: { kind: "available", tag: newest.tag_name, url: newest.html_url } });
       } else {
         set({ state: { kind: "upToDate" } });
       }

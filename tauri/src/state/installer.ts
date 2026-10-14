@@ -5,6 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { baseName, joinPath, native, streamToEnd, type ApkEntry } from "../lib/native";
 import {
+  apkVersion,
   compareVersions,
   displayName,
   isReady,
@@ -32,6 +33,17 @@ export interface DeviceDetails {
 
 type Job = { kind: "install"; files: string[]; reinstall: boolean } | { kind: "uninstall"; pkg: string };
 
+export interface LastInstalled {
+  pkg: string;
+  label: string | null;
+  version: string;
+  file: string;
+  devices: string[];
+  at: number;
+}
+
+export type AppAction = "launch" | "restart" | "stop" | "settings" | "clearData";
+
 interface InstallerState {
   devices: Device[];
   selected: string[];
@@ -49,6 +61,7 @@ interface InstallerState {
   watchedFolders: string[];
   autoInstall: boolean;
   launchAfterInstall: boolean;
+  lastInstalled: LastInstalled | null;
 
   start: () => Promise<void>;
   refreshDevices: () => Promise<void>;
@@ -63,6 +76,7 @@ interface InstallerState {
   enqueueInstall: (files: string[], reinstall: boolean) => void;
   enqueueUninstall: (pkg: string) => void;
   dismissFailure: () => void;
+  appAction: (action: AppAction) => Promise<void>;
 }
 
 export const apkKey = (a: ApkEntry) => `${a.path}|${a.modifiedMs}`;
@@ -173,12 +187,12 @@ function detectNewApks(all: ApkEntry[]) {
   }
 }
 
-async function packageName(file: string): Promise<string | null> {
+async function apkDetails(file: string): Promise<ApkInfo | null> {
   const cached = get().apks.find((a) => a.path === file);
   const info = cached ? apkInfo(get(), cached) : null;
-  if (info) return info.pkg;
+  if (info) return info;
   if (!toolReady("aapt2")) return null;
-  return parseBadging((await native.run("aapt2", ["dump", "badging", file], 30000)).output)?.pkg ?? null;
+  return parseBadging((await native.run("aapt2", ["dump", "badging", file], 30000)).output);
 }
 
 async function waitForTargets(): Promise<Device[] | null> {
@@ -288,8 +302,19 @@ async function runJob(job: Job) {
       ok = true;
       if (job.kind === "install") {
         for (const file of job.files) {
-          const pkg = await packageName(file);
-          for (const device of devices) ok = (await installOne(device, file, pkg, job.reinstall)) && ok;
+          const details = await apkDetails(file);
+          const pkg = details?.pkg ?? null;
+          const installedOn: string[] = [];
+          for (const device of devices) {
+            const success = await installOne(device, file, pkg, job.reinstall);
+            if (success) installedOn.push(displayName(device));
+            ok = success && ok;
+          }
+          if (details && installedOn.length) {
+            const last = { pkg: details.pkg, label: details.label, version: apkVersion(details), file, devices: installedOn, at: Date.now() };
+            set({ lastInstalled: last });
+            save("lastInstalled", last);
+          }
           invalidateInstalled(pkg);
         }
       } else {
@@ -341,7 +366,8 @@ export const useInstaller = create<InstallerState>(() => ({
   reinstallMode: false,
   watchedFolders: load<string[]>("watchedFolders", []),
   autoInstall: load("autoInstall", false),
-  launchAfterInstall: load("launchAfterInstall", false),
+  launchAfterInstall: load("launchAfterInstall", true),
+  lastInstalled: load<LastInstalled | null>("lastInstalled", null),
 
   start: async () => {
     if (!get().watchedFolders.length) {
@@ -451,6 +477,31 @@ export const useInstaller = create<InstallerState>(() => ({
   enqueueUninstall: (pkg) => enqueue({ kind: "uninstall", pkg }),
 
   dismissFailure: () => set({ failureHint: null }),
+
+  appAction: async (action) => {
+    const last = get().lastInstalled;
+    const devices = targets(get());
+    if (!last || !devices.length) {
+      if (!devices.length) log("error", "Žádné vybrané zařízení.");
+      return;
+    }
+    const q = `'${last.pkg}'`;
+    const launch = `monkey -p ${q} -c android.intent.category.LAUNCHER 1`;
+    const commands: Record<AppAction, [string, string]> = {
+      launch: ["Spouštím", launch],
+      restart: ["Restartuji", `am force-stop ${q}; ${launch}`],
+      stop: ["Zastavuji", `am force-stop ${q}`],
+      settings: ["Otevírám nastavení", `am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d 'package:${last.pkg}'`],
+      clearData: ["Mažu data", `pm clear ${q}`],
+    };
+    const [title, command] = commands[action];
+    for (const device of devices) {
+      log("command", `${title} ${last.pkg} → ${displayName(device)}`);
+      const r = await adb(["-s", device.serial, "shell", command], 30000);
+      const out = r.output.split("\n").filter((l) => l.trim() && !l.includes("Events injected") && !l.startsWith("  bash arg")).join("\n").trim();
+      if (out) log(r.status === 0 ? "output" : "error", out);
+    }
+  },
 }));
 
 export function diagnostics(): string {
