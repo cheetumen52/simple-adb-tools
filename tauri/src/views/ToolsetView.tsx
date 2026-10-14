@@ -4,7 +4,7 @@ import {
   Lock, MonitorSmartphone, Network, Pause, Play, Power, RefreshCw, Save, Settings, Square, Sun, Terminal, Trash2, Undo2, Volume1, Volume2,
   Wifi, WifiOff, Hand,
 } from "lucide-react";
-import { displayName, isWireless } from "../lib/parse";
+import { displayName, isEmulator, isWireless } from "../lib/parse";
 import { tabNumber, useApp } from "../state/app";
 import { useToolchain } from "../state/toolchain";
 import { readyDevices, useInstaller } from "../state/installer";
@@ -491,7 +491,7 @@ function WirelessSection() {
         <div className="row" style={{ gap: 14 }}>
           <CardTitle kicker="nejrychlejší cesta" title="Přepnout připojený telefon na Wi‑Fi" subtitle="Telefon musí být na kabelu a ve stejné síti jako počítač. Pak kabel odpojíš a ladíš bezdrátově." />
           <div className="spacer" />
-          <Button variant="primary" small icon={<Wifi size={13} />} disabled={!device || isWireless(device)} onClick={() => void t.switchToWifi()}>Přepnout na Wi‑Fi</Button>
+          <Button variant="primary" small icon={<Wifi size={13} />} disabled={!device || isWireless(device) || isEmulator(device)} onClick={() => void t.switchToWifi()}>Přepnout na Wi‑Fi</Button>
         </div>
       </Card>
       <div className="grid-2">

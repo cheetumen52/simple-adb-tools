@@ -83,6 +83,11 @@ input, textarea, .selectable { user-select: text; }
   border-bottom: 1px solid var(--hairline);
 }
 .header.mac { padding-left: 88px; }
+.header > :not(.spacer) { flex-shrink: 0; }
+.brand-name, .brand .kicker, .tab { white-space: nowrap; }
+/* Narrow windows: keep the header on one line by shortening the update button, then the subtitle. */
+@media (max-width: 1080px) { .update-text { display: none; } }
+@media (max-width: 900px) { .brand-sub { display: none; } }
 .brand-name { font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
 .tabs, .subnav {
   display: flex;

@@ -62,14 +62,14 @@ function Header() {
   return (
     <header className={`header${paths?.platform === "macos" ? " mac" : ""}`} data-tauri-drag-region>
       <BrandMark size={30} arrow />
-      <div className="stack" style={{ gap: 2 }} data-tauri-drag-region>
+      <div className="stack brand" style={{ gap: 2 }} data-tauri-drag-region>
         <div className="brand-name">{BRAND.appName}</div>
-        <Kicker muted>by {BRAND.company}</Kicker>
+        <div className="brand-sub"><Kicker muted>by {BRAND.company}</Kicker></div>
       </div>
       <div className="spacer" data-tauri-drag-region />
       {update.kind === "available" && (
-        <Button variant="primary" small icon={<Sparkles size={13} />} onClick={() => void openUrl(update.url)} title="Otevře stránku s novou verzí na GitHubu">
-          Nová verze {update.tag}
+        <Button variant="primary" small icon={<Sparkles size={13} />} onClick={() => void openUrl(update.url)} title={`Nová verze ${update.tag} – otevře stránku na GitHubu`}>
+          <span className="update-text">Nová verze </span>{update.tag}
         </Button>
       )}
       <nav className="tabs">

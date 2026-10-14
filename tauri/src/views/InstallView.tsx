@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
-import { Cable, Camera, Folder, MonitorSmartphone, MonitorX, MoreHorizontal, OctagonX, Package, RotateCw, Smartphone, Wifi, WifiOff, Wrench, X } from "lucide-react";
-import { apkVersion, displayName, isReady, isWireless, type Device } from "../lib/parse";
+import { Cable, Camera, Folder, Monitor, MonitorSmartphone, MonitorX, MoreHorizontal, OctagonX, Package, RefreshCw, RotateCw, Smartphone, Wifi, WifiOff, Wrench, X } from "lucide-react";
+import { apkVersion, displayName, isEmulator, isReady, isWireless, type Device } from "../lib/parse";
 import { bytes, timeAgo } from "../lib/format";
 import { tabNumber, useApp } from "../state/app";
 import { useToolchain } from "../state/toolchain";
@@ -25,7 +25,10 @@ function DeviceRow({ device }: { device: Device }) {
     <Card compact highlight={ready && isSelected}>
       <div className="row" style={{ gap: 12, cursor: ready ? "pointer" : "default" }} onClick={() => ready && toggleSelected(device.serial)}>
         <Checkbox checked={isSelected} disabled={!ready} onChange={() => toggleSelected(device.serial)} />
-        {isWireless(device) ? <Wifi size={20} color={ready ? "var(--accent)" : "var(--text-muted)"} /> : <Smartphone size={20} color={ready ? "var(--accent)" : "var(--text-muted)"} />}
+        {(() => {
+          const Icon = isEmulator(device) ? Monitor : isWireless(device) ? Wifi : Smartphone;
+          return <Icon size={20} color={ready ? "var(--accent)" : "var(--text-muted)"} />;
+        })()}
         <div className="stack" style={{ gap: 2, flex: 1, minWidth: 0 }}>
           <span style={{ fontWeight: 600, fontSize: 13.5 }}>{displayName(device)}</span>
           <div className="row" style={{ gap: 6 }}>
@@ -39,6 +42,7 @@ function DeviceRow({ device }: { device: Device }) {
             <Button small icon={mirroring ? <MonitorX size={14} /> : <MonitorSmartphone size={14} />} onClick={() => mirror.toggle(device)} title={mirroring ? "Ukončit zrcadlení" : "Zrcadlit obrazovku"} />
           )}
           {ready && <Button small icon={<Camera size={14} />} onClick={() => void screenshot(device)} title="Screenshot z telefonu na plochu" />}
+          {isEmulator(device) && <Pill color="var(--accent)" dot={false}>Emulátor</Pill>}
           {device.state === "device" && <Pill>Připojeno</Pill>}
           {device.state === "unauthorized" && <Pill color="var(--warn)">Potvrď ladění USB na telefonu</Pill>}
           {device.state === "offline" && <Pill color="var(--danger)">Offline</Pill>}
@@ -50,7 +54,7 @@ function DeviceRow({ device }: { device: Device }) {
 }
 
 function DevicesSection() {
-  const { devices, running, restartAdb } = useInstaller();
+  const { devices, running, restartAdb, refreshDevices } = useInstaller();
   useWireless((s) => s.states);
   const adbReady = useToolchain((s) => s.adb.kind === "found");
   const setTab = useApp((s) => s.setTab);
@@ -60,6 +64,7 @@ function DevicesSection() {
       <div className="row">
         <Kicker muted>zařízení</Kicker>
         <div className="spacer" />
+        <Button small icon={<RefreshCw size={13} />} disabled={!adbReady} onClick={() => void refreshDevices()} title="Znovu načíst seznam zařízení">Obnovit</Button>
         <Button small icon={<RotateCw size={13} />} disabled={running || !adbReady} onClick={() => void restartAdb()}>Restartovat adb</Button>
       </div>
       {!adbReady ? (

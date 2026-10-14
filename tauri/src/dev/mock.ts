@@ -23,9 +23,9 @@ function runTool(tool: string, args: string[]): { status: number; output: string
   }
   const joined = args.join(" ");
   if (joined === "devices -l")
-    return ok(`List of devices attached\n${HUAWEI}       device usb:2-1 product:MAR-LX1AEEA model:MAR_LX1A device:HWMAR transport_id:1\n${SAMSUNG}            device usb:1-1 product:m13nseea model:SM_M135F device:m13 transport_id:2\n`);
+    return ok(`List of devices attached\n${HUAWEI}       device usb:2-1 product:MAR-LX1AEEA model:MAR_LX1A device:HWMAR transport_id:1\n${SAMSUNG}            device usb:1-1 product:m13nseea model:SM_M135F device:m13 transport_id:2\nemulator-5554          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:3\n`);
   if (joined.includes("getprop ro.build.version.release; getprop ro.product.manufacturer"))
-    return ok(joined.includes(HUAWEI) ? `10\nHUAWEI\n${HUAWEI}\n` : `14\nsamsung\n${SAMSUNG}\n`);
+    return ok(joined.includes(HUAWEI) ? `10\nHUAWEI\n${HUAWEI}\n` : joined.includes("emulator") ? `15\nGoogle\nEMULATOR35X1X11X0\n` : `14\nsamsung\n${SAMSUNG}\n`);
   if (joined.includes("dumpsys package com.cuppka.app.dev") || joined.includes("dumpsys package 'com.cuppka.app.dev'"))
     return ok(`Package [com.cuppka.app.dev] (abc):\n    versionCode=261008925 minSdk=24 targetSdk=35\n    versionName=1.10.1\n    firstInstallTime=2026-10-13 14:27:43\n    lastUpdateTime=2026-10-14 08:57:34\n`);
   if (joined.includes("dumpsys package")) return ok("");
@@ -74,3 +74,12 @@ mockIPC(
   },
   { shouldMockEvents: true },
 );
+
+// `?mock&update` pretends a newer release exists on GitHub.
+if (new URLSearchParams(location.search).has("update")) {
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input, init) =>
+    String(input).includes("api.github.com")
+      ? Promise.resolve(new Response(JSON.stringify([{ name: "v1.2.0" }, { name: "v1.1.1" }]), { status: 200 }))
+      : realFetch(input, init);
+}

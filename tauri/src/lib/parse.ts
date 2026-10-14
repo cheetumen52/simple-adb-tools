@@ -5,7 +5,8 @@ export interface Device {
 }
 
 export const isReady = (d: Device) => d.state === "device";
-export const isWireless = (d: Device) => d.serial.includes(":") || d.serial.includes("._adb-tls-");
+export const isEmulator = (d: Device) => d.serial.startsWith("emulator-");
+export const isWireless = (d: Device) => !isEmulator(d) && (d.serial.includes(":") || d.serial.includes("._adb-tls-"));
 export const displayName = (d: Device) => d.model ?? (isReady(d) ? d.serial : "Neznámé zařízení");
 
 export function parseDevices(out: string): Device[] {
@@ -13,7 +14,7 @@ export function parseDevices(out: string): Device[] {
     .split("\n")
     .slice(1)
     .map((line) => line.trim().split(/\s+/))
-    .filter((p) => p.length >= 2 && p[0] && !p[0].startsWith("emulator-") && !p[0].startsWith("*"))
+    .filter((p) => p.length >= 2 && p[0] && !p[0].startsWith("*"))
     .map((p) => {
       const model = p.find((x) => x.startsWith("model:"));
       return { serial: p[0], state: p[1], model: model ? model.slice(6).replaceAll("_", " ") : null };
