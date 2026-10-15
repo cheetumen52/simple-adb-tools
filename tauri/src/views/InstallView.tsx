@@ -3,6 +3,7 @@ import { recentDevice, useRecentApps, type RecentAction } from "../state/recentA
 import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
 import { AlignLeft, Eraser, Play, RefreshCcw, Settings, Square, Trash2 } from "lucide-react";
 import { useToolset } from "../state/toolset";
+import { latestCrash, useCrashes } from "../state/crashes";
 import { Cable, Camera, Folder, Monitor, MonitorSmartphone, MonitorX, MoreHorizontal, OctagonX, Package, RefreshCw, RotateCw, Smartphone, Wifi, WifiOff, Wrench, X } from "lucide-react";
 import { apkVersion, displayName, isEmulator, isReady, isWireless, type Device } from "../lib/parse";
 import { bytes, timeAgo } from "../lib/format";
@@ -359,6 +360,7 @@ function LastAppSection() {
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const last = s.lastInstalled;
   const allowed = targets(s).length > 0;
+  const crash = useCrashes((c) => (last ? latestCrash(c.events, last.pkg) : null));
   const t = useT();
   const m = t.install;
 
@@ -387,6 +389,11 @@ function LastAppSection() {
                   {last.pkg}  ·  {last.version}  ·  {timeAgo(last.at)}  ·  {last.devices.join(", ")}
                 </span>
               </div>
+              {crash && (
+                <button className="pill-button" onClick={() => { useToolset.getState().setSection("crashes"); setTab("toolset"); }}>
+                  <Pill color="var(--danger)">{t.crashes.lastCrash(timeAgo(crash.at))}</Pill>
+                </button>
+              )}
               {!allowed && <Pill color="var(--warn)" dot={false}>{m.pickDevice}</Pill>}
             </div>
             <div className="row wrap">

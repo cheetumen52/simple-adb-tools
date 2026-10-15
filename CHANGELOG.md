@@ -4,6 +4,12 @@ Všechny podstatné změny Simple ADB tools. Anglická verze je v [CHANGELOG.en.
 
 ## [Nevydáno]
 
+### Přidáno
+- Hlídání pádů: aplikace sleduje logcat všech připojených zařízení a pád, nativní pád nebo ANR ukáže i se stack trace, notifikací a odznakem v hlavičce. Z pádu jde aplikaci rovnou restartovat, otevřít její logcat, zkopírovat nebo uložit report.
+
+### Změněno
+- ADB toolset má postranní menu rozdělené do skupin a nadpis s popisem každé sekce. Na úzkém okně zůstanou jen ikony.
+
 ## [1.2.1] - 2026-10-14
 
 ### Opraveno

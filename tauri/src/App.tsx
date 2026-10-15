@@ -2,13 +2,14 @@ import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Sparkles } from "lucide-react";
+import { Bug, Sparkles } from "lucide-react";
 import { BRAND, TABS, useApp } from "./state/app";
 import { allReady, useToolchain } from "./state/toolchain";
 import { useInstaller } from "./state/installer";
 import { useWireless } from "./state/wireless";
 import { useUpdates } from "./state/updates";
 import { useToolset } from "./state/toolset";
+import { useCrashes } from "./state/crashes";
 import { useDrag, type DropTarget } from "./state/drag";
 import { native } from "./lib/native";
 import { BrandMark, Button, Kicker, Spinner } from "./components/ui";
@@ -39,6 +40,7 @@ async function startup() {
   await useToolchain.getState().check();
   if (!allReady(useToolchain.getState())) useApp.getState().setTab("requirements");
   await useInstaller.getState().start();
+  useCrashes.getState().sync();
   useWireless.getState().start();
   useUpdates.getState().start();
 
@@ -71,6 +73,7 @@ function Header() {
   const { tab, setTab, paths } = useApp();
   const toolchain = useToolchain();
   const update = useUpdates((s) => s.state);
+  const unseenCrashes = useCrashes((s) => s.unseen);
   const t = useT();
   const alert = toolchain.checkedOnce && !allReady(toolchain);
   return (
@@ -81,6 +84,12 @@ function Header() {
         <div className="brand-sub"><Kicker muted>{t.header.by} {BRAND.company}</Kicker></div>
       </div>
       <div className="spacer" data-tauri-drag-region />
+      {unseenCrashes > 0 && (
+        <button className="crash-badge" title={t.crashes.badgeHelp} onClick={() => { useToolset.getState().setSection("crashes"); setTab("toolset"); }}>
+          <Bug size={13} />
+          {t.crashes.badge(unseenCrashes)}
+        </button>
+      )}
       {update.kind === "available" && (
         <Button
           variant="primary"
