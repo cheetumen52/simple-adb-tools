@@ -11,8 +11,10 @@ Všechny podstatné změny Simple ADB tools. Anglická verze je v [CHANGELOG.en.
 - Více zařízení najednou: výběr všech, screenshot a zrcadlení vybraných zařízení, v Ovládání a Testování přepínač „Na všechna zařízení“. Karta zařízení ukazuje stav baterie.
 - Správce souborů: procházení úložiště telefonu, stažení do Stažených, nahrání přetažením, nová složka, přejmenování a mazání. U debug buildů i soukromá data aplikace přes run-as (databáze, SharedPreferences, cache).
 - Makro po instalaci: kromě spuštění jde zapnout udělení všech oprávnění (install -g), otevření logcatu aplikace a zrcadlení obrazovky.
+- Sekce Deep linky: odkazy s intent extras (text, int, long, float, bool), cílovou aplikací a uložením pro opakované testy. Schémata a odkazy aplikace se vyčtou přímo z manifestu, otevírat jde i na všech zařízeních najednou.
 
 ### Změněno
+- Deep linky se přestěhovaly z Ovládání do vlastní sekce.
 - Instalace a odinstalace běží na všech vybraných zařízeních paralelně a u každého je vidět průběh. Výpis v logu nese název zařízení.
 - Sekce Vývojář je teď součástí sekce Testování.
 - ADB toolset má postranní menu rozdělené do skupin a nadpis s popisem každé sekce. Na úzkém okně zůstanou jen ikony.

@@ -4,23 +4,23 @@ import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { baseName, joinPath, native, streamTool } from "../lib/native";
 import { displayName, isWireless, logcatLevel, packageList, sections, shQuote, type Device } from "../lib/parse";
 import { fileStamp } from "../lib/format";
-import { load, save } from "../lib/storage";
 import { log } from "./log";
 import { useApp } from "./app";
 import { readyDevices, useInstaller } from "./installer";
 import { useWireless } from "./wireless";
 import { useTesting } from "./testing";
 import { useFiles } from "./files";
+import { useDeepLinks } from "./deeplinks";
 import { tr } from "../i18n";
 import { parseAppLocales, parseRuntimePermissions, type RuntimePermission } from "../lib/devicetools";
 
-export type ToolsetSection = "overview" | "mirror" | "files" | "apps" | "logcat" | "crashes" | "control" | "wireless" | "testing" | "shell";
+export type ToolsetSection = "overview" | "mirror" | "files" | "apps" | "logcat" | "crashes" | "deeplinks" | "control" | "wireless" | "testing" | "shell";
 export type SectionGroup = "device" | "apps" | "testing" | "advanced";
 
 /** Sidebar order; labels live in the translations under `toolset.sections` and `toolset.groups`. */
 export const SECTION_GROUPS: { group: SectionGroup; sections: ToolsetSection[] }[] = [
   { group: "device", sections: ["overview", "mirror", "files", "control"] },
-  { group: "apps", sections: ["apps", "logcat", "crashes"] },
+  { group: "apps", sections: ["apps", "logcat", "crashes", "deeplinks"] },
   { group: "testing", sections: ["testing", "wireless"] },
   { group: "advanced", sections: ["shell"] },
 ];
@@ -29,7 +29,7 @@ export const SECTION_GROUPS: { group: SectionGroup; sections: ToolsetSection[] }
 export const DEVICELESS: ToolsetSection[] = ["wireless", "crashes"];
 
 /** Sections whose actions can go to every connected device at once. */
-export const BROADCAST: ToolsetSection[] = ["control", "testing"];
+export const BROADCAST: ToolsetSection[] = ["control", "deeplinks", "testing"];
 
 export type DevToggle = "showTouches" | "pointerLocation" | "animationsOff" | "darkMode" | "stayAwake" | "layoutBounds";
 
@@ -85,8 +85,6 @@ interface ToolsetState {
   shellHistory: ShellEntry[];
   shellRunning: boolean;
   typeText: string;
-  deepLink: string;
-  deepLinkHistory: string[];
   connectHost: string;
   pairHost: string;
   pairCode: string;
@@ -122,7 +120,6 @@ interface ToolsetState {
   toggleRecording: () => Promise<void>;
   key: (code: number, label: string) => void;
   sendText: () => void;
-  openDeepLink: (link?: string) => void;
   openDeveloperOptions: () => void;
   switchToWifi: () => Promise<void>;
   connect: () => Promise<void>;
@@ -233,8 +230,6 @@ export const useToolset = create<ToolsetState>((set) => ({
   shellHistory: [],
   shellRunning: false,
   typeText: "",
-  deepLink: "",
-  deepLinkHistory: load<string[]>("deepLinkHistory", []),
   connectHost: "",
   pairHost: "",
   pairCode: "",
@@ -258,6 +253,7 @@ export const useToolset = create<ToolsetState>((set) => ({
     const s = get();
     if (s.section === "overview") void s.loadInfo();
     if (s.section === "apps" && !s.packages.length) void s.loadPackages();
+    if (s.section === "deeplinks") void useDeepLinks.getState().loadPackages();
     if (s.section === "files") void useFiles.getState().open(useFiles.getState().path);
     if (s.section === "testing") {
       void s.loadToggles();
@@ -558,15 +554,6 @@ export const useToolset = create<ToolsetState>((set) => ({
     if (!text) return;
     runOnDevice(tr().toolset.logs.typing, `input text ${shQuote(text.replaceAll(" ", "%s"))}`);
     set({ typeText: "" });
-  },
-
-  openDeepLink: (link) => {
-    const url = (link ?? get().deepLink).trim();
-    if (!url) return;
-    runOnDevice(tr().toolset.logs.opening(url), `am start -W -a android.intent.action.VIEW -d ${shQuote(url)}`);
-    const history = [url, ...get().deepLinkHistory.filter((h) => h !== url)].slice(0, 8);
-    set({ deepLinkHistory: history });
-    save("deepLinkHistory", history);
   },
 
   openDeveloperOptions: () => runOnDevice(tr().toolset.logs.developerOptions, "am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS"),

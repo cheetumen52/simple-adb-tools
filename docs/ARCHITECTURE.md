@@ -54,6 +54,7 @@ Platform details:
 | `recentApps` | recently installed apps on a device (`pm list packages -3` + `dumpsys package packages`) |
 | `toolset` | ADB toolset sections (overview, apps incl. permissions and app language, logcat, control, Wi‑Fi, shell) |
 | `files` | file manager: `ls -la` listing (`lib/files.ts`), shared storage or an app's private data through `run-as` |
+| `deeplinks` | saved deep links with extras, history, the app's own links parsed from its Activity Resolver Table (`lib/deeplinks.ts`) |
 | `testing` | test toggles of the selected device: proxy, network, font size, density, battery |
 | `wireless` | known Wi‑Fi devices, auto-reconnect, local network diagnostics |
 | `mirror` | running scrcpy windows and their options |
