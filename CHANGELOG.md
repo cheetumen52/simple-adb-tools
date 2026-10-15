@@ -6,8 +6,11 @@ Všechny podstatné změny Simple ADB tools. Anglická verze je v [CHANGELOG.en.
 
 ### Přidáno
 - Hlídání pádů: aplikace sleduje logcat všech připojených zařízení a pád, nativní pád nebo ANR ukáže i se stack trace, notifikací a odznakem v hlavičce. Z pádu jde aplikaci rovnou restartovat, otevřít její logcat, zkopírovat nebo uložit report.
+- Sekce Testování: proxy pro Charles, Proxyman nebo mitmproxy jedním klikem (přes adb reverse i přes síť), režim letadlo, Wi‑Fi a mobilní data, velikost písma, hustota displeje, tmavý režim, simulace baterie a Doze.
+- U aplikace jde povolit nebo odebrat runtime oprávnění a nastavit její jazyk (Android 13+), včetně arabštiny a hebrejštiny pro test RTL.
 
 ### Změněno
+- Sekce Vývojář je teď součástí sekce Testování.
 - ADB toolset má postranní menu rozdělené do skupin a nadpis s popisem každé sekce. Na úzkém okně zůstanou jen ikony.
 
 ## [1.2.1] - 2026-10-14

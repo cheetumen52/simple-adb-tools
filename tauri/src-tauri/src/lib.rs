@@ -80,6 +80,7 @@ pub fn run() {
             proc::stream_tool,
             proc::stop_stream,
             net::probe_tcp,
+            net::local_ips,
             files::list_apks,
             files::system_paths,
             files::write_text,

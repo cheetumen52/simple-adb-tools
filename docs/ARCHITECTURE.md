@@ -34,6 +34,7 @@ The backend runs only three binaries: `adb`, `aapt2` and `scrcpy`. The WebView c
 | `run_tool_to_file` | Binary stdout into a file (screenshots via `exec-out screencap`). |
 | `stream_tool` / `stop_stream` | Long-running processes (logcat, scrcpy, installs). Lines arrive in batches (`proc-lines`), the end as `proc-exit`. `interrupt` sends SIGINT on Unix so scrcpy and screenrecord finish their files. |
 | `probe_tcp` | A connection attempt from the app itself: `reachable` / `refused` / `blocked` / `timeout`. |
+| `local_ips` | The computer's primary LAN address, for the proxy-over-network option. |
 | `set_locale` | Language of user-facing backend errors. |
 | `list_apks`, `system_paths`, `write_text`, `make_dir`, `path_exists`, `take_pending_files` | Files, and APKs opened through the OS. |
 
@@ -51,7 +52,8 @@ Platform details:
 | `toolchain` | tool status and installs |
 | `installer` | devices, watched folders, APK info (`aapt2`), installed versions, install queue, last install |
 | `recentApps` | recently installed apps on a device (`pm list packages -3` + `dumpsys package packages`) |
-| `toolset` | ADB toolset sections (overview, apps, logcat, control, Wi‑Fi, developer, shell) |
+| `toolset` | ADB toolset sections (overview, apps incl. permissions and app language, logcat, control, Wi‑Fi, shell) |
+| `testing` | test toggles of the selected device: proxy, network, font size, density, battery |
 | `wireless` | known Wi‑Fi devices, auto-reconnect, local network diagnostics |
 | `mirror` | running scrcpy windows and their options |
 | `crashes` | crash watch: one `logcat -b crash -b system` stream per device, parsed by `lib/crash.ts` into crash, native crash and ANR events |
@@ -75,6 +77,7 @@ Settings live in `localStorage` (`lib/storage.ts`) and every read has a default.
 - **Restarting the adb server drops Wi‑Fi connections.** The queue therefore re-reads devices first and restarts only when it really sees none.
 - **macOS Local Network access** belongs to the process that started the adb server. When the phone answers the app but not the adb server, `wireless.diagnose` restarts the server under the app.
 - **The Wi‑Fi port on Android 11+** changes every time debugging is turned on. Recovery finds it via `adb mdns services` by `ro.serialno`.
+- **Proxy via adb** sets the phone's proxy to `127.0.0.1:<port>` and runs `adb reverse`, so it works over USB and Wi‑Fi without a shared network. Turning the proxy off removes only that one reverse rule (other tools, e.g. Metro, may use their own).
 - **Crash watch** starts each device's logcat at the device's own clock (`-T "MM-DD hh:mm:ss.000"`), so old crashes in the buffer are not reported again. Only third-party apps count unless the user opts in; the package list is re-read when an unknown package crashes (it may have just been installed).
 - **System apps** are removed for the current user only (`pm uninstall -k --user 0`) and can be restored with `cmd package install-existing`.
 - **zustand selectors** must not return a freshly created array or object; React then loops re-rendering forever.

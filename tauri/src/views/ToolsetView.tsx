@@ -1,26 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlignLeft, ArrowUpFromLine, Cable, Camera, ChevronLeft, Circle, Eraser, Eye, FileDown, Hammer, Home, Info, Layers, LayoutGrid,
+  AlignLeft, ArrowUpFromLine, Cable, Camera, ChevronLeft, Circle, Eraser, Eye, FileDown, Home, Info, Layers, LayoutGrid,
   Lock, MonitorSmartphone, Network, Pause, Play, Power, RefreshCw, Save, Settings, Square, Sun, Terminal, Trash2, Undo2, Volume1, Volume2,
-  Wifi, WifiOff, Hand, Bug,
+  Wifi, WifiOff, Hand, Bug, FlaskConical,
 } from "lucide-react";
 import { displayName, isEmulator, isWireless } from "../lib/parse";
 import { tabNumber, useApp } from "../state/app";
 import { useToolchain } from "../state/toolchain";
 import { useInstaller } from "../state/installer";
-import { DEV_TOGGLES, DEVICELESS, LOG_LEVELS, SECTION_GROUPS, useToolset, type LogLevel, type ToolsetSection } from "../state/toolset";
+import { DEVICELESS, LOG_LEVELS, SECTION_GROUPS, useToolset, type LogLevel, type ToolsetSection } from "../state/toolset";
 import { useCrashes } from "../state/crashes";
 import { CrashesSection } from "./toolset/CrashesSection";
+import { TestingSection } from "./toolset/TestingSection";
 import { DevicePicker, InfoGrid, useDevice } from "./toolset/shared";
 import { knownId, wirelessStatus, useWireless, type KnownWireless, type WirelessState } from "../state/wireless";
 import { MIRROR_SIZES, MIRROR_SOURCES, useMirror, type MirrorSource } from "../state/mirror";
 import { useDrag } from "../state/drag";
 import { Button, Card, CardTitle, ConfirmDialog, Elapsed, Kicker, Menu, Pill, Progress, Spinner, Switch, TextField, type ConfirmRequest } from "../components/ui";
 import { LogPanel } from "../components/LogPanel";
-import { useT, type Messages } from "../i18n";
+import { locale, useT, type Messages } from "../i18n";
+import { permissionLabel } from "../lib/devicetools";
 
 const ICONS: Record<ToolsetSection, typeof Info> = {
-  overview: Info, mirror: MonitorSmartphone, apps: LayoutGrid, logcat: AlignLeft, crashes: Bug, control: Hand, wireless: Wifi, developer: Hammer, shell: Terminal,
+  overview: Info, mirror: MonitorSmartphone, apps: LayoutGrid, logcat: AlignLeft, crashes: Bug, control: Hand, wireless: Wifi, testing: FlaskConical, shell: Terminal,
 };
 
 function SectionNav() {
@@ -216,6 +218,49 @@ function MirrorSection() {
 
 /* ---------- Apps ---------- */
 
+// Arabic and Hebrew are there to test right-to-left layouts.
+const APP_LOCALES = ["cs-CZ", "sk-SK", "en-US", "en-GB", "de-DE", "pl-PL", "uk-UA", "fr-FR", "es-ES", "it-IT", "hu-HU", "ar", "he", "ja-JP"];
+
+function AppPermissions({ pkg }: { pkg: string }) {
+  const { packagePermissions, packageLocales, setPermission, setAppLocale } = useToolset();
+  const a = useT().toolset.apps;
+  const names = new Intl.DisplayNames([locale()], { type: "language" });
+  const current = packageLocales?.[0] ?? "";
+  return (
+    <div className="grid-2" style={{ gap: 14 }}>
+      <div className="stack" style={{ gap: 8 }}>
+        <div className="row">
+          <Kicker muted>{a.permissionsKicker}</Kicker>
+          <div className="spacer" />
+          {packagePermissions.length > 0 && (
+            <>
+              <Button variant="link" onClick={() => void setPermission(pkg, packagePermissions.filter((p) => !p.granted).map((p) => p.name), true)}>{a.grantAll}</Button>
+              <Button variant="link" onClick={() => void setPermission(pkg, packagePermissions.filter((p) => p.granted).map((p) => p.name), false)}>{a.revokeAll}</Button>
+            </>
+          )}
+        </div>
+        {packagePermissions.length === 0 && <span className="caption">{a.noPermissions}</span>}
+        {packagePermissions.map((p) => (
+          <Switch key={p.name} label={<span className="mono-sm">{permissionLabel(p.name)}</span>} checked={p.granted} onChange={(v) => void setPermission(pkg, [p.name], v)} />
+        ))}
+      </div>
+      <div className="stack" style={{ gap: 8 }}>
+        <Kicker muted>{a.localeKicker}</Kicker>
+        {packageLocales == null ? (
+          <span className="caption">{a.localeUnsupported}</span>
+        ) : (
+          <select className="field" value={current} onChange={(e) => void setAppLocale(pkg, e.target.value || null)}>
+            <option value="">{a.localeSystem}</option>
+            {[...new Set([...(current && !APP_LOCALES.includes(current) ? [current] : []), ...APP_LOCALES])].map((tag) => (
+              <option key={tag} value={tag}>{names.of(tag) ?? tag} ({tag})</option>
+            ))}
+          </select>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AppsSection() {
   const t = useToolset();
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
@@ -272,6 +317,7 @@ function AppsSection() {
               {system && <Pill color="var(--warn)" dot={false}>{a.systemPill}</Pill>}
             </div>
             <InfoGrid rows={t.packageDetails} />
+            <AppPermissions pkg={pkg} />
             <div className="row wrap">
               <Button variant="primary" small icon={<Play size={13} />} onClick={() => t.launch(pkg)}>{m.common.launch}</Button>
               <Button small icon={<Square size={13} />} onClick={() => t.forceStop(pkg)}>{m.common.stop}</Button>
@@ -526,38 +572,6 @@ function WirelessSection() {
   );
 }
 
-/* ---------- Developer ---------- */
-
-function DeveloperSection() {
-  const t = useToolset();
-  const m = useT().toolset.developer;
-  return (
-    <div className="stack" style={{ gap: 14 }}>
-      <div className="grid-2">
-        {DEV_TOGGLES.map((id) => {
-          const on = t.toggles[id];
-          return (
-            <Card key={id} highlight={on === true}>
-              <div className="row top" style={{ gap: 12, minHeight: 54 }}>
-                <div className="stack" style={{ gap: 4, flex: 1 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13.5 }}>{m.toggles[id].title}</span>
-                  <span className="caption">{m.toggles[id].help}</span>
-                </div>
-                {on === undefined ? <Spinner /> : <Switch label="" checked={on} onChange={(v) => void t.setToggle(id, v)} />}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-      <div className="row">
-        <span className="caption">{m.hint}</span>
-        <div className="spacer" />
-        <Button small icon={<RefreshCw size={13} />} onClick={() => void t.loadToggles()}>{m.reload}</Button>
-      </div>
-    </div>
-  );
-}
-
 /* ---------- Shell ---------- */
 
 type SnippetLabel = keyof Messages["toolset"]["shell"]["snippets"];
@@ -626,7 +640,7 @@ export function ToolsetView() {
       case "crashes": return <CrashesSection />;
       case "control": return <ControlSection />;
       case "wireless": return <WirelessSection />;
-      case "developer": return <DeveloperSection />;
+      case "testing": return <TestingSection />;
       case "shell": return <ShellSection />;
       default: return null;
     }
