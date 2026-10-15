@@ -6,7 +6,7 @@ import { displayName, isWireless, logcatLevel, packageList, sections, shQuote, t
 import { fileStamp } from "../lib/format";
 import { log } from "./log";
 import { useApp } from "./app";
-import { readyDevices, useInstaller } from "./installer";
+import { physicalDevices, readyDevices, useInstaller } from "./installer";
 import { useWireless } from "./wireless";
 import { useTesting } from "./testing";
 import { useFiles } from "./files";
@@ -44,6 +44,15 @@ export interface InfoRow {
   value: string;
 }
 
+/** Headline tiles of the overview; `fraction` drives the bar (0–1). */
+export interface StatTile {
+  label: string;
+  value: string;
+  sub: string;
+  fraction: number | null;
+  warn?: boolean;
+}
+
 export interface LogcatLine {
   id: number;
   level: string;
@@ -61,6 +70,7 @@ interface ToolsetState {
   serial: string | null;
   section: ToolsetSection;
   info: InfoRow[];
+  stats: StatTile[];
   loadingInfo: boolean;
   packages: string[];
   systemPackages: string[];
@@ -153,7 +163,7 @@ export function targetDevices(): Device[] {
   const d = device();
   if (!d) return [];
   const s = get();
-  return s.broadcast && BROADCAST.includes(s.section) ? readyDevices(useInstaller.getState()) : [d];
+  return s.broadcast && BROADCAST.includes(s.section) ? physicalDevices(useInstaller.getState()) : [d];
 }
 
 function runOnDevice(title: string, command: string) {
@@ -207,6 +217,7 @@ export const useToolset = create<ToolsetState>((set) => ({
   serial: null,
   section: "overview",
   info: [],
+  stats: [],
   loadingInfo: false,
   packages: [],
   systemPackages: [],
@@ -305,22 +316,26 @@ export const useToolset = create<ToolsetState>((set) => ({
       const t = Number(battery("temperature"));
       if (!Number.isNaN(t)) batteryText += ` · ${(t / 10).toFixed(1)} °C`;
     }
+    // `df -h /data | tail -1`: filesystem, size, used, available, use%, mount.
     const storage = last("storage").split(/\s+/);
+    const usedPct = Number(storage[4]?.replace("%", ""));
     const ip = s.ip?.match(/inet (\d+\.\d+\.\d+\.\d+)/)?.[1] ?? m.noWifi;
     const uptime = s.uptime?.match(/up ([^,]+)/)?.[1];
     const manufacturer = last("manufacturer");
+    const t = tr().toolset.overview;
     set({
       loadingInfo: false,
+      stats: [
+        { label: m.android, value: last("release"), sub: `API ${last("sdk")}`, fraction: null },
+        { label: m.battery, value: level ? `${level} %` : "–", sub: batteryText.split(" · ").slice(1).join(" · "), fraction: level ? Number(level) / 100 : null, warn: !!level && Number(level) <= 15 },
+        { label: m.storage, value: storage.length >= 5 ? t.storageUsed(storage[2], storage[1]) : "–", sub: storage.length >= 4 ? m.storageFree(storage[3], storage[1]) : "", fraction: Number.isNaN(usedPct) ? null : usedPct / 100, warn: usedPct >= 90 },
+        { label: t.display, value: afterColon("size").replace("x", " × "), sub: `${afterColon("density")} dpi`, fraction: null },
+      ],
       info: [
         { label: m.manufacturer, value: manufacturer.charAt(0).toUpperCase() + manufacturer.slice(1).toLowerCase() },
         { label: m.model, value: last("model") },
-        { label: m.android, value: `${last("release")} (API ${last("sdk")})` },
         { label: m.abi, value: last("abi") },
         { label: m.build, value: last("build") },
-        { label: m.resolution, value: afterColon("size") },
-        { label: m.density, value: `${afterColon("density")} dpi` },
-        { label: m.battery, value: batteryText },
-        { label: m.storage, value: storage.length >= 4 ? m.storageFree(storage[3], storage[1]) : "–" },
         { label: m.ip, value: ip },
         { label: m.uptime, value: uptime ? tr().format.uptime(uptime) : "–" },
         { label: m.serial, value: d.serial },

@@ -11,6 +11,22 @@ export const isEmulator = (d: Device) => d.serial.startsWith("emulator-");
 export const isWireless = (d: Device) => !isEmulator(d) && (d.serial.includes(":") || d.serial.includes("._adb-tls-"));
 export const displayName = (d: Device) => d.model ?? (isReady(d) ? d.serial : tr().common.unknownDevice);
 
+/**
+ * One entry per physical phone. A phone on USB and Wi‑Fi at once is listed twice by `adb devices`;
+ * the USB connection wins. Devices whose hardware serial isn't known yet are kept.
+ */
+export function distinctDevices(devices: Device[], hardwareSerial: (serial: string) => string | null | undefined): Device[] {
+  const keep = new Set<Device>();
+  const seen = new Set<string>();
+  for (const d of [...devices].sort((a, b) => Number(isWireless(a)) - Number(isWireless(b)))) {
+    const hw = hardwareSerial(d.serial);
+    if (hw && seen.has(hw)) continue;
+    if (hw) seen.add(hw);
+    keep.add(d);
+  }
+  return devices.filter((d) => keep.has(d));
+}
+
 export function parseDevices(out: string): Device[] {
   return out
     .split("\n")

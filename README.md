@@ -6,6 +6,10 @@
 [![Release](https://img.shields.io/github/v/release/cheetumen52/simple-adb-tools)](https://github.com/cheetumen52/simple-adb-tools/releases/latest)
 [![License](https://img.shields.io/github/license/cheetumen52/simple-adb-tools)](LICENSE)
 
+![Simple ADB tools installing an APK on a phone and an emulator at once](docs/images/install.webp)
+
+More at [hejzlar-development.cz/en/simple-adb-tools](https://hejzlar-development.cz/en/simple-adb-tools).
+
 ## Supported languages
 
 | Language | App | Installer (Windows) | Changelog |
@@ -18,12 +22,22 @@ The app follows the system language (Slovak systems get Czech, everything else f
 ## Features
 
 - **APK installation**: drag and drop into the window, "Open with" from Finder/Explorer, or pick from watched folders. An install queue, a comparison against the version on the phone, plain-language error explanations with a one-click reinstall, and optional auto-install of new builds from Downloads.
-- **Quick app controls**: the last app you installed and the 10 most recently installed apps on the device. Launch, restart, logcat, clear data, uninstall.
-- **ADB toolset**: device overview, screen mirroring via [scrcpy](https://github.com/Genymobile/scrcpy), app management (including pulling APKs off the phone), live logcat, screenshots and screen recording, remote buttons, deep links, developer toggles and a shell.
+- **Several devices at once**: installs run in parallel on every selected phone and emulator; screenshots, mirroring and the Control and Testing actions can target all of them.
+- **After-install macro**: launch the app, grant all permissions (`install -g`), open its logcat or start mirroring.
+- **Crash watch**: logcat is watched on every device; crashes, native crashes and ANRs show up with stack traces, a notification and a header badge.
+- **Testing toggles**: one-click proxy for Charles, Proxyman or mitmproxy (via `adb reverse` or the network), airplane mode, Wi‑Fi and mobile data, font size, display density, dark mode, battery simulation and Doze.
+- **File manager**: browse, download, upload by dragging, rename and delete; for debug builds also the app's private data via `run-as`.
+- **Deep links**: intent extras, a target app, saved links and the app's own links read from its manifest.
+- **Quick app controls**: the last app you installed and the 10 most recently installed apps on the device. Launch, restart, logcat, clear data, uninstall, runtime permissions and per-app language.
+- **ADB toolset**: device overview, screen mirroring via [scrcpy](https://github.com/Genymobile/scrcpy), app management (including pulling APKs off the phone), live logcat, screenshots and screen recording, remote buttons and a shell.
 - **Wi‑Fi debugging**: switch a phone to Wi‑Fi in one click, pair Android 11+ devices, and reconnect automatically when the connection drops.
 - **No SDK required**: the app can download adb, aapt2 and scrcpy from their official sources.
 - **Automatic updates**, signed with the project key.
 - **English and Czech**, following the system language or your choice in Settings.
+
+| Crash watch | Testing toggles |
+|---|---|
+| ![A caught crash with its stack trace](docs/images/crashes.webp) | ![Proxy, network, display and battery toggles](docs/images/testing.webp) |
 
 ## Download
 

@@ -47,6 +47,8 @@ export const en: Messages = {
     copy: "Copy",
     clear: "Clear",
     empty: "$ waiting for the first APK_",
+    collapse: "Collapse log",
+    expand: "Expand log",
   },
 
   confirm: {
@@ -166,6 +168,7 @@ export const en: Messages = {
     lastEmpty: "After your first install you'll find quick app controls here: launch, restart, logcat and more.",
     pickDevice: "select a device",
     selectAll: "Select all",
+    sameAsUsb: "same phone as on USB",
     selectNone: "Clear selection",
     selectedCount: (n, total) => `${n} of ${total} selected`,
     screenshotSelected: "Screenshot selected",
@@ -260,6 +263,8 @@ export const en: Messages = {
       powerKicker: "power",
       rebootCard: "Restart",
       rebootSubtitle: "Normal restart or a flashing mode.",
+      display: "Display",
+      storageUsed: (used, total) => `${used} of ${total}`,
     },
     info: {
       manufacturer: "Manufacturer",

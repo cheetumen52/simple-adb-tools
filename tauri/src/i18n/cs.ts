@@ -46,6 +46,8 @@ export const cs = {
     copy: "Kopírovat",
     clear: "Vymazat",
     empty: "$ čekám na první APK_",
+    collapse: "Sbalit log",
+    expand: "Rozbalit log",
   },
 
   confirm: {
@@ -166,6 +168,7 @@ export const cs = {
     lastEmpty: "Po první instalaci tu najdeš rychlé ovládání aplikace: spuštění, restart, logcat a další.",
     pickDevice: "vyber zařízení",
     selectAll: "Vybrat vše",
+    sameAsUsb: "stejný telefon jako přes USB",
     selectNone: "Zrušit výběr",
     selectedCount: (n: number, total: number) => `Vybráno ${n} z ${total}`,
     screenshotSelected: "Screenshot vybraných",
@@ -260,6 +263,8 @@ export const cs = {
       powerKicker: "napájení",
       rebootCard: "Restart",
       rebootSubtitle: "Běžný restart nebo režim pro flashování.",
+      display: "Displej",
+      storageUsed: (used: string, total: string) => `${used} z ${total}`,
     },
     info: {
       manufacturer: "Výrobce",

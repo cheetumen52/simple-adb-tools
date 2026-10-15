@@ -31,6 +31,8 @@ function applyLanguage() {
 async function startup() {
   if (started) return;
   started = true;
+  // After a WebView reload the backend may still run the previous page's streams; nothing here knows their ids.
+  await native.stopAllStreams().catch(() => {});
   applyLanguage();
   useI18n.subscribe((s, prev) => {
     if (s.lang === prev.lang) return;

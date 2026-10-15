@@ -2,10 +2,10 @@ import { create } from "zustand";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { native, streamTool } from "../lib/native";
 import { CrashCollector, type CrashEvent } from "../lib/crash";
-import { displayName, isReady, packageList } from "../lib/parse";
+import { displayName, packageList } from "../lib/parse";
 import { load, save } from "../lib/storage";
 import { tr } from "../i18n";
-import { useInstaller } from "./installer";
+import { physicalDevices, useInstaller } from "./installer";
 import { toolReady } from "./toolchain";
 
 export interface CrashRecord extends CrashEvent {
@@ -95,17 +95,26 @@ async function startWatcher(serial: string) {
     const since = /^\d\d-\d\d \d\d:\d\d:\d\d\.000$/.test(now) ? now : "1";
     const args = ["-s", serial, "logcat", "-v", "time", "-T", since, "-b", "crash", "-b", "system", "AndroidRuntime:E", "ActivityManager:E", "DEBUG:F", "libc:F", "*:S"];
     w.thirdParty = await thirdPartyPackages(serial);
-    w.id = await streamTool("adb", args, {
+    // A sync may have dropped this watcher while it was starting (e.g. it turned out to be a Wi‑Fi duplicate).
+    if (watchers.get(serial) !== w) return;
+    const id = await streamTool("adb", args, {
       onLines: (lines) => {
         for (const line of lines) deliver(serial, w.collector.push(line));
         if (w.flushTimer) window.clearTimeout(w.flushTimer);
         w.flushTimer = window.setTimeout(() => deliver(serial, w.collector.flush()), QUIET_MS);
       },
       onExit: () => {
-        if (watchers.get(serial) === w) dropWatcher(serial);
-        scheduleSync(RESTART_DELAY_MS);
+        if (watchers.get(serial) === w) {
+          dropWatcher(serial);
+          scheduleSync(RESTART_DELAY_MS);
+        }
       },
     });
+    if (watchers.get(serial) !== w) {
+      void native.stopStream(id);
+      return;
+    }
+    w.id = id;
   } catch {
     dropWatcher(serial);
   }
@@ -151,7 +160,8 @@ export const useCrashes = create<CrashesState>((set) => ({
   clear: () => set({ events: [], unseen: 0 }),
 
   sync: () => {
-    const wanted = get().enabled && toolReady("adb") ? useInstaller.getState().devices.filter(isReady).map((d) => d.serial) : [];
+    // One watcher per physical phone, or a phone on USB and Wi‑Fi would report every crash twice.
+    const wanted = get().enabled && toolReady("adb") ? physicalDevices(useInstaller.getState()).map((d) => d.serial) : [];
     for (const serial of [...watchers.keys()]) if (!wanted.includes(serial)) stopWatcher(serial);
     for (const serial of wanted) {
       if (watchers.has(serial)) continue;
@@ -162,8 +172,9 @@ export const useCrashes = create<CrashesState>((set) => ({
   },
 }));
 
+// Details carry the hardware serial that tells a Wi‑Fi duplicate apart, so they re-run the (idempotent) sync too.
 useInstaller.subscribe((s, prev) => {
-  if (s.devices !== prev.devices) get().sync();
+  if (s.devices !== prev.devices || s.details !== prev.details) get().sync();
 });
 
 /** Newest crash of a package, for badges next to the app. */

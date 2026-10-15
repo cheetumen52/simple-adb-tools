@@ -79,6 +79,7 @@ pub fn run() {
             proc::run_tool_to_file,
             proc::stream_tool,
             proc::stop_stream,
+            proc::stop_all_streams,
             net::probe_tcp,
             net::local_ips,
             files::list_apks,

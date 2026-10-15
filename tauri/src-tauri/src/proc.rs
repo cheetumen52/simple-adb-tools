@@ -262,6 +262,14 @@ pub async fn stop_stream(
     Ok(())
 }
 
+/// Stops every stream. The frontend calls it on start, so a WebView reload doesn't leave the previous
+/// page's logcat, crash-watch or scrcpy processes running unseen.
+#[tauri::command]
+pub async fn stop_all_streams(streams: State<'_, Streams>) -> Result<(), String> {
+    stop_all(&streams).await;
+    Ok(())
+}
+
 pub async fn stop_all(streams: &Streams) {
     let mut map = streams.0.lock().await;
     for handle in map.values_mut() {
