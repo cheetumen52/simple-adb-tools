@@ -2,76 +2,52 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlignLeft, ArrowUpFromLine, Cable, Camera, ChevronLeft, Circle, Eraser, Eye, FileDown, Hammer, Home, Info, Layers, LayoutGrid,
   Lock, MonitorSmartphone, Network, Pause, Play, Power, RefreshCw, Save, Settings, Square, Sun, Terminal, Trash2, Undo2, Volume1, Volume2,
-  Wifi, WifiOff, Hand,
+  Wifi, WifiOff, Hand, Bug,
 } from "lucide-react";
 import { displayName, isEmulator, isWireless } from "../lib/parse";
 import { tabNumber, useApp } from "../state/app";
 import { useToolchain } from "../state/toolchain";
-import { readyDevices, useInstaller } from "../state/installer";
-import { currentDevice, DEV_TOGGLES, LOG_LEVELS, SECTIONS, useToolset, type LogLevel, type ToolsetSection } from "../state/toolset";
+import { useInstaller } from "../state/installer";
+import { DEV_TOGGLES, DEVICELESS, LOG_LEVELS, SECTION_GROUPS, useToolset, type LogLevel, type ToolsetSection } from "../state/toolset";
+import { useCrashes } from "../state/crashes";
+import { CrashesSection } from "./toolset/CrashesSection";
+import { DevicePicker, InfoGrid, useDevice } from "./toolset/shared";
 import { knownId, wirelessStatus, useWireless, type KnownWireless, type WirelessState } from "../state/wireless";
 import { MIRROR_SIZES, MIRROR_SOURCES, useMirror, type MirrorSource } from "../state/mirror";
 import { useDrag } from "../state/drag";
-import { Button, Card, CardTitle, ConfirmDialog, Elapsed, Kicker, Menu, Pill, Progress, SectionHeader, Spinner, Switch, TextField, type ConfirmRequest } from "../components/ui";
+import { Button, Card, CardTitle, ConfirmDialog, Elapsed, Kicker, Menu, Pill, Progress, Spinner, Switch, TextField, type ConfirmRequest } from "../components/ui";
 import { LogPanel } from "../components/LogPanel";
 import { useT, type Messages } from "../i18n";
 
 const ICONS: Record<ToolsetSection, typeof Info> = {
-  overview: Info, mirror: MonitorSmartphone, apps: LayoutGrid, logcat: AlignLeft, control: Hand, wireless: Wifi, developer: Hammer, shell: Terminal,
+  overview: Info, mirror: MonitorSmartphone, apps: LayoutGrid, logcat: AlignLeft, crashes: Bug, control: Hand, wireless: Wifi, developer: Hammer, shell: Terminal,
 };
-
-function useDevice() {
-  const serial = useToolset((s) => s.serial);
-  useInstaller((s) => s.devices);
-  return currentDevice(serial);
-}
-
-function DevicePicker() {
-  const all = useInstaller((s) => s.devices);
-  const devices = readyDevices({ devices: all });
-  const device = useDevice();
-  const set = useToolset((s) => s.set);
-  if (devices.length > 1) {
-    return (
-      <select className="field" style={{ width: 200 }} value={device?.serial ?? ""} onChange={(e) => set({ serial: e.target.value })}>
-        {devices.map((d) => <option key={d.serial} value={d.serial}>{displayName(d)}</option>)}
-      </select>
-    );
-  }
-  return device ? <Pill>{displayName(device)}</Pill> : null;
-}
 
 function SectionNav() {
   const { section, setSection, logcatRunning } = useToolset();
   const mirroring = useMirror((s) => Object.keys(s.running).length > 0);
+  const unseen = useCrashes((s) => s.unseen);
   const t = useT();
   return (
-    <nav className="subnav" style={{ alignSelf: "flex-start", flexWrap: "wrap" }}>
-      {SECTIONS.map((id) => {
-        const Icon = ICONS[id];
-        return (
-          <button key={id} className={`subtab${section === id ? " active" : ""}`} onClick={() => setSection(id)}>
-            <Icon size={12} />
-            {t.toolset.sections[id]}
-            {id === "logcat" && logcatRunning && <span className="dot" style={{ background: "var(--danger)", width: 5, height: 5 }} />}
-            {id === "mirror" && mirroring && <span className="dot" style={{ background: "var(--light-cyan)", width: 5, height: 5 }} />}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-function InfoGrid({ rows }: { rows: { label: string; value: string }[] }) {
-  return (
-    <div className="grid-2" style={{ gap: 10 }}>
-      {rows.map((r) => (
-        <div key={r.label} className="stack" style={{ gap: 2 }}>
-          <span className="kicker muted" style={{ letterSpacing: "0.12em" }}>{r.label}</span>
-          <span className="mono selectable">{r.value}</span>
+    <nav className="toolnav">
+      {SECTION_GROUPS.map(({ group, sections }) => (
+        <div key={group} className="toolnav-group">
+          <span className="kicker muted toolnav-label">{t.toolset.groups[group]}</span>
+          {sections.map((id) => {
+            const Icon = ICONS[id];
+            return (
+              <button key={id} className={`navitem${section === id ? " active" : ""}`} onClick={() => setSection(id)} title={t.toolset.sections[id]}>
+                <Icon size={14} />
+                <span className="navlabel">{t.toolset.sections[id]}</span>
+                {id === "logcat" && logcatRunning && <span className="dot navmark" style={{ background: "var(--danger)" }} />}
+                {id === "mirror" && mirroring && <span className="dot navmark" style={{ background: "var(--light-cyan)" }} />}
+                {id === "crashes" && unseen > 0 && <span className="navbadge">{unseen}</span>}
+              </button>
+            );
+          })}
         </div>
       ))}
-    </div>
+    </nav>
   );
 }
 
@@ -647,6 +623,7 @@ export function ToolsetView() {
       case "overview": return <OverviewSection />;
       case "mirror": return <MirrorSection />;
       case "apps": return <AppsSection />;
+      case "crashes": return <CrashesSection />;
       case "control": return <ControlSection />;
       case "wireless": return <WirelessSection />;
       case "developer": return <DeveloperSection />;
@@ -655,40 +632,42 @@ export function ToolsetView() {
     }
   };
 
-  const locked = !device && section !== "wireless";
+  const deviceless = DEVICELESS.includes(section);
+  const locked = !device && !deviceless;
   return (
-    <>
-      <div style={{ padding: "24px 24px 14px", display: "flex", flexDirection: "column", gap: 16 }}>
-        <SectionHeader
-          number={tabNumber("toolset")}
-          kicker={m.kicker}
-          title={m.title}
-          lede={m.lede}
-          trailing={<DevicePicker />}
-        />
-        <SectionNav />
-      </div>
-      {locked ? (
-        <div className="scroll" style={{ padding: "0 24px" }}>
-          <Card>
-            <div className="row" style={{ gap: 12 }}>
-              <Cable size={18} color="var(--text-muted)" />
-              <div className="stack" style={{ gap: 2, flex: 1 }}>
-                <span style={{ fontWeight: 600 }}>{m.noPhone}</span>
-                <span className="caption">{m.noPhoneHint}</span>
-              </div>
-              <Button small onClick={() => setTab("requirements")}>{m.guide}</Button>
-            </div>
-          </Card>
+    <div className="toolset">
+      <SectionNav />
+      <div className="toolmain">
+        <div className="toolhead">
+          <div className="stack" style={{ gap: 4, flex: 1, minWidth: 0 }}>
+            <Kicker>{tabNumber("toolset")} · {m.kicker}</Kicker>
+            <div className="toolhead-title">{m.sections[section]}</div>
+            <div className="lede">{m.descriptions[section]}</div>
+          </div>
+          {!deviceless && <DevicePicker />}
         </div>
-      ) : section === "logcat" ? (
-        <LogcatSection />
-      ) : (
-        <>
-          <div className="scroll"><div style={{ padding: "0 24px 24px" }}>{body()}</div></div>
-          {section !== "shell" && <LogPanel height={160} />}
-        </>
-      )}
-    </>
+        {locked ? (
+          <div className="scroll" style={{ padding: "0 24px" }}>
+            <Card>
+              <div className="row" style={{ gap: 12 }}>
+                <Cable size={18} color="var(--text-muted)" />
+                <div className="stack" style={{ gap: 2, flex: 1 }}>
+                  <span style={{ fontWeight: 600 }}>{m.noPhone}</span>
+                  <span className="caption">{m.noPhoneHint}</span>
+                </div>
+                <Button small onClick={() => setTab("requirements")}>{m.guide}</Button>
+              </div>
+            </Card>
+          </div>
+        ) : section === "logcat" ? (
+          <LogcatSection />
+        ) : (
+          <>
+            <div className="scroll"><div style={{ padding: "0 24px 24px" }}>{body()}</div></div>
+            {section !== "shell" && section !== "crashes" && <LogPanel height={160} />}
+          </>
+        )}
+      </div>
+    </div>
   );
 }

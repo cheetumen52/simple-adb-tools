@@ -318,3 +318,84 @@ select.field { font-family: var(--font); font-size: 12px; cursor: pointer; }
 .pkg-item { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 8px; border: none; border-radius: 6px; background: none; color: var(--text-secondary); font-family: var(--font-mono); font-size: 11.5px; text-align: left; cursor: pointer; }
 .pkg-item:hover { background: var(--hairline); }
 .pkg-item.active { background: rgba(1, 181, 213, 0.15); color: var(--text-light); }
+
+/* Toolset: grouped sidebar + section header */
+.toolset { flex: 1; min-height: 0; display: flex; }
+.toolnav {
+  width: 188px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 10px;
+  overflow-y: auto;
+  border-right: 1px solid var(--hairline);
+  background: rgba(13, 17, 23, 0.55);
+}
+.toolnav-group { display: flex; flex-direction: column; gap: 2px; }
+.toolnav-label { padding: 0 10px 6px; font-size: 9.5px; }
+.navitem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.navitem svg { color: var(--text-muted); flex-shrink: 0; }
+.navitem:hover { background: var(--hairline); color: var(--text-light); }
+.navitem.active { background: var(--surface-3); border-color: rgba(1, 181, 213, 0.35); color: var(--text-light); font-weight: 600; }
+.navitem.active svg { color: var(--accent); }
+.navmark { margin-left: auto; width: 6px; height: 6px; }
+.navbadge {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+}
+.toolmain { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.toolhead { display: flex; align-items: flex-start; gap: 16px; padding: 22px 24px 16px; }
+.toolhead-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.toolhead .lede { font-size: 12.5px; }
+/* Narrow windows: icons only, labels as tooltips. */
+@media (max-width: 980px) {
+  .toolnav { width: 58px; padding: 16px 8px; align-items: center; }
+  .toolnav-label, .navlabel { display: none; }
+  .navitem { justify-content: center; padding: 9px; }
+  .navmark, .navbadge { position: absolute; top: 3px; right: 3px; margin: 0; }
+  .navbadge { min-width: 14px; padding: 0 4px; font-size: 9px; }
+}
+
+details.trace summary { cursor: pointer; color: var(--text-secondary); font-size: 11.5px; font-family: var(--font-mono); }
+details.trace summary:hover { color: var(--text-light); }
+details.trace pre { margin: 8px 0 0; max-height: 260px; overflow: auto; font-size: 10.5px; white-space: pre; }
+
+.crash-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 81, 73, 0.45);
+  background: rgba(248, 81, 73, 0.12);
+  color: #ff7b72;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.crash-badge:hover { background: rgba(248, 81, 73, 0.2); }
+.pill-button { border: none; background: none; padding: 0; cursor: pointer; }

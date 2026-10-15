@@ -4,6 +4,12 @@ All notable changes to Simple ADB tools. The Czech version is in [CHANGELOG.md](
 
 ## [Unreleased]
 
+### Added
+- Crash watch: the app follows logcat on every connected device and shows a crash, native crash or ANR with its stack trace, a notification and a header badge. From a crash you can restart the app, open its logcat, or copy or save the report.
+
+### Changed
+- The ADB toolset has a grouped sidebar and a heading with a description for every section. Narrow windows show icons only.
+
 ## [1.2.1] - 2026-10-14
 
 ### Fixed

@@ -54,6 +54,7 @@ Platform details:
 | `toolset` | ADB toolset sections (overview, apps, logcat, control, Wi‑Fi, developer, shell) |
 | `wireless` | known Wi‑Fi devices, auto-reconnect, local network diagnostics |
 | `mirror` | running scrcpy windows and their options |
+| `crashes` | crash watch: one `logcat -b crash -b system` stream per device, parsed by `lib/crash.ts` into crash, native crash and ANR events |
 | `updates` | update check and install |
 | `log` | shared log, survives a WebView reload (sessionStorage) |
 | `i18n` | chosen language (`system` / `cs` / `en`) and the resolved one |
@@ -74,6 +75,7 @@ Settings live in `localStorage` (`lib/storage.ts`) and every read has a default.
 - **Restarting the adb server drops Wi‑Fi connections.** The queue therefore re-reads devices first and restarts only when it really sees none.
 - **macOS Local Network access** belongs to the process that started the adb server. When the phone answers the app but not the adb server, `wireless.diagnose` restarts the server under the app.
 - **The Wi‑Fi port on Android 11+** changes every time debugging is turned on. Recovery finds it via `adb mdns services` by `ro.serialno`.
+- **Crash watch** starts each device's logcat at the device's own clock (`-T "MM-DD hh:mm:ss.000"`), so old crashes in the buffer are not reported again. Only third-party apps count unless the user opts in; the package list is re-read when an unknown package crashes (it may have just been installed).
 - **System apps** are removed for the current user only (`pm uninstall -k --user 0`) and can be restored with `cmd package install-existing`.
 - **zustand selectors** must not return a freshly created array or object; React then loops re-rendering forever.
 

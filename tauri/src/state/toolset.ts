@@ -11,10 +11,19 @@ import { readyDevices, useInstaller } from "./installer";
 import { useWireless } from "./wireless";
 import { tr } from "../i18n";
 
-export type ToolsetSection = "overview" | "mirror" | "apps" | "logcat" | "control" | "wireless" | "developer" | "shell";
+export type ToolsetSection = "overview" | "mirror" | "apps" | "logcat" | "crashes" | "control" | "wireless" | "developer" | "shell";
+export type SectionGroup = "device" | "apps" | "testing" | "advanced";
 
-/** Labels live in the translations under `toolset.sections`. */
-export const SECTIONS: ToolsetSection[] = ["overview", "mirror", "apps", "logcat", "control", "wireless", "developer", "shell"];
+/** Sidebar order; labels live in the translations under `toolset.sections` and `toolset.groups`. */
+export const SECTION_GROUPS: { group: SectionGroup; sections: ToolsetSection[] }[] = [
+  { group: "device", sections: ["overview", "mirror", "control"] },
+  { group: "apps", sections: ["apps", "logcat", "crashes"] },
+  { group: "testing", sections: ["developer", "wireless"] },
+  { group: "advanced", sections: ["shell"] },
+];
+
+/** Sections that work across devices and need no device picked. */
+export const DEVICELESS: ToolsetSection[] = ["wireless", "crashes"];
 
 export type DevToggle = "showTouches" | "pointerLocation" | "animationsOff" | "darkMode" | "stayAwake" | "layoutBounds";
 
