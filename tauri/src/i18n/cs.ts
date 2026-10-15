@@ -212,6 +212,7 @@ export const cs = {
     sections: {
       overview: "Přehled",
       mirror: "Zrcadlení",
+      files: "Soubory",
       apps: "Aplikace",
       logcat: "Logcat",
       crashes: "Pády",
@@ -223,6 +224,7 @@ export const cs = {
     descriptions: {
       overview: "Hardware, Android, baterie a úložiště vybraného zařízení. Soubory sem přetáhni a skončí v telefonu.",
       mirror: "Obrazovka telefonu v okně na počítači, s ovládáním myší a klávesnicí.",
+      files: "Úložiště telefonu i soukromá data debug buildů. Stahuj, nahrávej přetažením, přejmenovávej a maž.",
       apps: "Nainstalované aplikace: spuštění, data, oprávnění, odinstalace i stažení APK.",
       logcat: "Živý výpis logů, filtrovaný podle aplikace, úrovně nebo textu.",
       crashes: "Pády a ANR ze všech připojených zařízení i se stack trace.",
@@ -501,6 +503,36 @@ export const cs = {
     lastCrash: (ago: string) => `spadla ${ago}`,
     pid: (pid: number) => `PID ${pid}`,
     trace: (n: number) => `Stack trace (${n} řádků)`,
+  },
+
+  files: {
+    storage: "Úložiště",
+    appData: "Data aplikace",
+    appDataHelp: "Soukromá data debug buildů přes run-as: databáze, SharedPreferences, cache.",
+    pickApp: "Vyber aplikaci…",
+    loadingApps: "Hledám debuggable aplikace…",
+    noDebuggable: "V zařízení není žádná debuggable aplikace. Soukromá data jdou procházet jen u debug buildů.",
+    up: "Nahoru",
+    newFolder: "Nová složka",
+    folderName: "název složky",
+    create: "Vytvořit",
+    upload: "Nahrát sem",
+    dropHint: "Přetáhni soubory sem a nahrají se do této složky.",
+    empty: "Složka je prázdná.",
+    cantRead: "Do složky nejde nahlédnout, nejspíš kvůli oprávnění.",
+    download: "Stáhnout do Stažených",
+    rename: "Přejmenovat",
+    delete: "Smazat",
+    deleteTitle: (name: string) => `Smazat ${name}?`,
+    deleteMessage: "Soubor nebo složka i s obsahem zmizí z telefonu. Tohle nejde vrátit.",
+    items: (n: number) => `${n} ${n === 1 ? "položka" : n >= 2 && n <= 4 ? "položky" : "položek"}`,
+    pulled: (name: string) => `✓ ${name} je ve Stažených`,
+    uploaded: (name: string) => `✓ ${name} nahráno do telefonu`,
+    logs: {
+      remove: (name: string) => `Mažu ${name}`,
+      rename: (from: string, to: string) => `Přejmenovávám ${from} → ${to}`,
+      mkdir: (name: string) => `Vytvářím složku ${name}`,
+    },
   },
 
   testing: {

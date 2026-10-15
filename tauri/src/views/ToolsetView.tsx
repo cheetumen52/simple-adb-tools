@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlignLeft, ArrowUpFromLine, Cable, Camera, ChevronLeft, Circle, Eraser, Eye, FileDown, Home, Info, Layers, LayoutGrid,
   Lock, MonitorSmartphone, Network, Pause, Play, Power, RefreshCw, Save, Settings, Square, Sun, Terminal, Trash2, Undo2, Volume1, Volume2,
-  Wifi, WifiOff, Hand, Bug, FlaskConical,
+  Wifi, WifiOff, Hand, Bug, FlaskConical, FolderOpen,
 } from "lucide-react";
 import { displayName, isEmulator, isReady, isWireless } from "../lib/parse";
 import { tabNumber, useApp } from "../state/app";
@@ -12,6 +12,7 @@ import { BROADCAST, DEVICELESS, LOG_LEVELS, SECTION_GROUPS, useToolset, type Log
 import { useCrashes } from "../state/crashes";
 import { CrashesSection } from "./toolset/CrashesSection";
 import { TestingSection } from "./toolset/TestingSection";
+import { FilesSection } from "./toolset/FilesSection";
 import { DevicePicker, InfoGrid, useDevice } from "./toolset/shared";
 import { knownId, wirelessStatus, useWireless, type KnownWireless, type WirelessState } from "../state/wireless";
 import { MIRROR_SIZES, MIRROR_SOURCES, useMirror, type MirrorSource } from "../state/mirror";
@@ -22,7 +23,7 @@ import { locale, useT, type Messages } from "../i18n";
 import { permissionLabel } from "../lib/devicetools";
 
 const ICONS: Record<ToolsetSection, typeof Info> = {
-  overview: Info, mirror: MonitorSmartphone, apps: LayoutGrid, logcat: AlignLeft, crashes: Bug, control: Hand, wireless: Wifi, testing: FlaskConical, shell: Terminal,
+  overview: Info, mirror: MonitorSmartphone, files: FolderOpen, apps: LayoutGrid, logcat: AlignLeft, crashes: Bug, control: Hand, wireless: Wifi, testing: FlaskConical, shell: Terminal,
 };
 
 function SectionNav() {
@@ -638,6 +639,7 @@ export function ToolsetView() {
     switch (section) {
       case "overview": return <OverviewSection />;
       case "mirror": return <MirrorSection />;
+      case "files": return <FilesSection />;
       case "apps": return <AppsSection />;
       case "crashes": return <CrashesSection />;
       case "control": return <ControlSection />;

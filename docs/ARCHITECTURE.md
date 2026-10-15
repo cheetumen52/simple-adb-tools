@@ -53,6 +53,7 @@ Platform details:
 | `installer` | devices, watched folders, APK info (`aapt2`), installed versions, install queue, last install |
 | `recentApps` | recently installed apps on a device (`pm list packages -3` + `dumpsys package packages`) |
 | `toolset` | ADB toolset sections (overview, apps incl. permissions and app language, logcat, control, Wi‑Fi, shell) |
+| `files` | file manager: `ls -la` listing (`lib/files.ts`), shared storage or an app's private data through `run-as` |
 | `testing` | test toggles of the selected device: proxy, network, font size, density, battery |
 | `wireless` | known Wi‑Fi devices, auto-reconnect, local network diagnostics |
 | `mirror` | running scrcpy windows and their options |
@@ -78,6 +79,7 @@ Settings live in `localStorage` (`lib/storage.ts`) and every read has a default.
 - **macOS Local Network access** belongs to the process that started the adb server. When the phone answers the app but not the adb server, `wireless.diagnose` restarts the server under the app.
 - **The Wi‑Fi port on Android 11+** changes every time debugging is turned on. Recovery finds it via `adb mdns services` by `ro.serialno`.
 - **Several devices**: installs run per file in parallel across the selected devices (`installer.progress` per serial, log lines prefixed with the device). In the Control and Testing sections `toolset.broadcast` sends every action to all ready devices (`targetDevices()`), while the displayed state stays the picked device's.
+- **App data in the file manager** goes through `run-as <pkg> sh -c …`, which works only for debuggable apps; the app list is exactly the packages for which `run-as <pkg> true` succeeds. Files are read with `exec-out run-as <pkg> cat`, uploads hop through `/data/local/tmp` and are copied in as the app's user.
 - **Proxy via adb** sets the phone's proxy to `127.0.0.1:<port>` and runs `adb reverse`, so it works over USB and Wi‑Fi without a shared network. Turning the proxy off removes only that one reverse rule (other tools, e.g. Metro, may use their own).
 - **Crash watch** starts each device's logcat at the device's own clock (`-T "MM-DD hh:mm:ss.000"`), so old crashes in the buffer are not reported again. Only third-party apps count unless the user opts in; the package list is re-read when an unknown package crashes (it may have just been installed).
 - **System apps** are removed for the current user only (`pm uninstall -k --user 0`) and can be restored with `cmd package install-existing`.

@@ -10,6 +10,7 @@ import { useWireless } from "./state/wireless";
 import { useUpdates } from "./state/updates";
 import { useToolset } from "./state/toolset";
 import { useCrashes } from "./state/crashes";
+import { useFiles } from "./state/files";
 import { useDrag, type DropTarget } from "./state/drag";
 import { native } from "./lib/native";
 import { BrandMark, Button, Kicker, Spinner } from "./components/ui";
@@ -64,6 +65,7 @@ async function startup() {
       const target = targetAt(p.position.x, p.position.y);
       useDrag.setState({ over: null });
       if (target === "push") void useToolset.getState().push(p.paths);
+      else if (target === "files") void useFiles.getState().upload(p.paths);
       else useInstaller.getState().enqueueInstall(p.paths, useInstaller.getState().reinstallMode);
     }
   });
