@@ -10,15 +10,16 @@ import { useApp } from "./app";
 import { readyDevices, useInstaller } from "./installer";
 import { useWireless } from "./wireless";
 import { useTesting } from "./testing";
+import { useFiles } from "./files";
 import { tr } from "../i18n";
 import { parseAppLocales, parseRuntimePermissions, type RuntimePermission } from "../lib/devicetools";
 
-export type ToolsetSection = "overview" | "mirror" | "apps" | "logcat" | "crashes" | "control" | "wireless" | "testing" | "shell";
+export type ToolsetSection = "overview" | "mirror" | "files" | "apps" | "logcat" | "crashes" | "control" | "wireless" | "testing" | "shell";
 export type SectionGroup = "device" | "apps" | "testing" | "advanced";
 
 /** Sidebar order; labels live in the translations under `toolset.sections` and `toolset.groups`. */
 export const SECTION_GROUPS: { group: SectionGroup; sections: ToolsetSection[] }[] = [
-  { group: "device", sections: ["overview", "mirror", "control"] },
+  { group: "device", sections: ["overview", "mirror", "files", "control"] },
   { group: "apps", sections: ["apps", "logcat", "crashes"] },
   { group: "testing", sections: ["testing", "wireless"] },
   { group: "advanced", sections: ["shell"] },
@@ -257,6 +258,7 @@ export const useToolset = create<ToolsetState>((set) => ({
     const s = get();
     if (s.section === "overview") void s.loadInfo();
     if (s.section === "apps" && !s.packages.length) void s.loadPackages();
+    if (s.section === "files") void useFiles.getState().open(useFiles.getState().path);
     if (s.section === "testing") {
       void s.loadToggles();
       void useTesting.getState().load();

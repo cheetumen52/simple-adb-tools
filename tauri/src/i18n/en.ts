@@ -212,6 +212,7 @@ export const en: Messages = {
     sections: {
       overview: "Overview",
       mirror: "Mirror",
+      files: "Files",
       apps: "Apps",
       logcat: "Logcat",
       crashes: "Crashes",
@@ -223,6 +224,7 @@ export const en: Messages = {
     descriptions: {
       overview: "Hardware, Android, battery and storage of the selected device. Drop files here to send them to the phone.",
       mirror: "The phone screen in a window on your computer, controlled with mouse and keyboard.",
+      files: "Phone storage and the private data of debug builds. Download, upload by dragging, rename and delete.",
       apps: "Installed apps: launch, data, permissions, uninstall and APK download.",
       logcat: "Live logs, filtered by app, level or text.",
       crashes: "Crashes and ANRs from every connected device, with stack traces.",
@@ -501,6 +503,36 @@ export const en: Messages = {
     lastCrash: (ago) => `crashed ${ago}`,
     pid: (pid) => `PID ${pid}`,
     trace: (n) => `Stack trace (${n} lines)`,
+  },
+
+  files: {
+    storage: "Storage",
+    appData: "App data",
+    appDataHelp: "Private data of debug builds via run-as: databases, SharedPreferences, cache.",
+    pickApp: "Pick an app…",
+    loadingApps: "Looking for debuggable apps…",
+    noDebuggable: "No debuggable app on the device. Private data can only be browsed for debug builds.",
+    up: "Up",
+    newFolder: "New folder",
+    folderName: "folder name",
+    create: "Create",
+    upload: "Upload here",
+    dropHint: "Drop files here to upload them into this folder.",
+    empty: "This folder is empty.",
+    cantRead: "This folder can't be read, probably because of permissions.",
+    download: "Download to Downloads",
+    rename: "Rename",
+    delete: "Delete",
+    deleteTitle: (name) => `Delete ${name}?`,
+    deleteMessage: "The file or folder and everything in it will be removed from the phone. This cannot be undone.",
+    items: (n) => `${n} ${n === 1 ? "item" : "items"}`,
+    pulled: (name) => `✓ ${name} is in Downloads`,
+    uploaded: (name) => `✓ ${name} uploaded to the phone`,
+    logs: {
+      remove: (name) => `Deleting ${name}`,
+      rename: (from, to) => `Renaming ${from} → ${to}`,
+      mkdir: (name) => `Creating folder ${name}`,
+    },
   },
 
   testing: {

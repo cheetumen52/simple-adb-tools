@@ -9,6 +9,7 @@ Všechny podstatné změny Simple ADB tools. Anglická verze je v [CHANGELOG.en.
 - Sekce Testování: proxy pro Charles, Proxyman nebo mitmproxy jedním klikem (přes adb reverse i přes síť), režim letadlo, Wi‑Fi a mobilní data, velikost písma, hustota displeje, tmavý režim, simulace baterie a Doze.
 - U aplikace jde povolit nebo odebrat runtime oprávnění a nastavit její jazyk (Android 13+), včetně arabštiny a hebrejštiny pro test RTL.
 - Více zařízení najednou: výběr všech, screenshot a zrcadlení vybraných zařízení, v Ovládání a Testování přepínač „Na všechna zařízení“. Karta zařízení ukazuje stav baterie.
+- Správce souborů: procházení úložiště telefonu, stažení do Stažených, nahrání přetažením, nová složka, přejmenování a mazání. U debug buildů i soukromá data aplikace přes run-as (databáze, SharedPreferences, cache).
 
 ### Změněno
 - Instalace a odinstalace běží na všech vybraných zařízeních paralelně a u každého je vidět průběh. Výpis v logu nese název zařízení.
