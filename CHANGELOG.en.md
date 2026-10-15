@@ -10,6 +10,7 @@ All notable changes to Simple ADB tools. The Czech version is in [CHANGELOG.md](
 - Apps: grant or revoke runtime permissions and set the app language (Android 13+), including Arabic and Hebrew for RTL testing.
 - Several devices at once: select all, screenshot and mirror the selected devices, and an "All devices" switch in Control and Testing. Device cards show the battery level.
 - File manager: browse the phone's storage, download to Downloads, upload by dragging, create folders, rename and delete. For debug builds also the app's private data via run-as (databases, SharedPreferences, cache).
+- After-install macro: besides launching, you can grant all permissions (install -g), open the app's logcat and start screen mirroring.
 
 ### Changed
 - Installs and uninstalls run on all selected devices in parallel, with progress for each. Log lines name their device.
