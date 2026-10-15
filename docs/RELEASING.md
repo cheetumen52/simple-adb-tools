@@ -1,36 +1,36 @@
-# Vydání nové verze
+# Releasing
 
-Vydání se dělá jen se souhlasem vlastníka projektu.
+Releases are made by the project owner only.
 
-## Postup
+## Steps
 
-Instalátory se stavějí jen při vydání. Vydání spustí push do `main`, ve kterém má aplikace verzi bez existujícího tagu, tedy sloučený PR s vydáním. Ostatní pushe do `main` skončí po kontrole verze a nic nestaví.
+Installers are built only for a release. A release is a push to `main` in which the app version has no tag yet, i.e. a merged release PR. Any other push to `main` stops after the version check and builds nothing.
 
-1. Všechno určené k vydání je sloučené v `main` a CI je zelené.
-2. Zvol číslo verze podle [SemVer](https://semver.org/lang/cs/): oprava → patch, nová funkce → minor.
-3. V `CHANGELOG.md` přejmenuj `## [Nevydáno]` na `## [X.Y.Z] - RRRR-MM-DD` a nad něj přidej prázdnou sekci `## [Nevydáno]`. Totéž v `CHANGELOG.en.md` s `## [Unreleased]`.
-4. Zvyš verzi na třech místech:
-   - `tauri/package.json` (a `package-lock.json` přes `npm install --package-lock-only`)
-   - `tauri/src-tauri/Cargo.toml` (`Cargo.lock` se aktualizuje sám při buildu nebo `cargo check`)
+1. Everything meant for the release is merged into `main` and CI is green.
+2. Pick the version by [SemVer](https://semver.org/): fix → patch, new feature → minor.
+3. In `CHANGELOG.md` rename `## [Nevydáno]` to `## [X.Y.Z] - YYYY-MM-DD` and add an empty `## [Nevydáno]` above it. Do the same in `CHANGELOG.en.md` with `## [Unreleased]`.
+4. Bump the version in three places:
+   - `tauri/package.json` (and `package-lock.json` via `npm install --package-lock-only`)
+   - `tauri/src-tauri/Cargo.toml` (`Cargo.lock` follows on the next build or `cargo check`)
    - `tauri/src-tauri/tauri.conf.json`
-5. Commit `Release X.Y.Z` ve větvi `release/X.Y.Z`, PR do `main` a merge (se souhlasem vlastníka). Tag se nedělá ručně.
-6. Workflow **Build & release** po pushi do `main`:
-   - zjistí, že tag `vX.Y.Z` ještě neexistuje (jinak skončí);
-   - spustí CI;
-   - vytvoří tag `vX.Y.Z` na sloučeném commitu;
-   - sestaví Windows (NSIS, MSI) a macOS (Apple Silicon, Intel) a podepíše balíčky pro updater;
-   - založí **návrh** vydání s anglickým i českým textem z changelogů (`scripts/release-notes.py`);
-   - poskládá `latest.json` pro updater.
-7. Zkontroluj návrh vydání (soubory `*-setup.exe`, `*.msi`, `*_aarch64.dmg`, `*_x64.dmg`, `*.app.tar.gz`, `*.sig`, `latest.json`) a zveřejni ho jako *Latest*.
+5. Commit `Release X.Y.Z` on a `release/X.Y.Z` branch, open a PR into `main` and merge it. Don't tag by hand.
+6. After the push to `main`, the **Build & release** workflow:
+   - sees that `vX.Y.Z` is not tagged yet (otherwise it stops);
+   - runs CI;
+   - tags the merged commit `vX.Y.Z`;
+   - builds Windows (NSIS, MSI) and macOS (Apple Silicon, Intel), ad-hoc signs the macOS bundle and signs the updater packages;
+   - creates a **draft** release with English and Czech notes from the changelogs (`scripts/release-notes.py`);
+   - assembles `latest.json` for the updater.
+7. Check the draft (`*-setup.exe`, `*.msi`, `*_aarch64.dmg`, `*_x64.dmg`, `*.app.tar.gz`, `*.sig`, `latest.json`) and publish it as *Latest*.
 
-Aplikace nabízí aktualizace jen ze zveřejněných vydání. Návrh ani samotný tag ji nespustí.
+The app offers updates from published releases only; a draft or a bare tag does not trigger it.
 
-## Automatické aktualizace
+## Automatic updates
 
-- Updater stahuje `https://github.com/cheetumen52/simple-adb-tools/releases/latest/download/latest.json`.
-- Balíčky jsou podepsané klíčem v GitHub secrets `TAURI_SIGNING_PRIVATE_KEY` a `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Veřejný klíč je v `tauri.conf.json` → `plugins.updater.pubkey`.
-- Záloha klíče je u vlastníka v `~/.tauri/simple-adb-tools.key` (+ `.password`). **Když se klíč ztratí, nainstalované aplikace už nepřijmou žádnou aktualizaci** a uživatelé musí jednou aktualizovat ručně.
-- Lokální podepsaný build:
+- The updater fetches `https://github.com/cheetumen52/simple-adb-tools/releases/latest/download/latest.json`.
+- Packages are signed with the key in the GitHub secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The public key is in `tauri.conf.json` → `plugins.updater.pubkey`.
+- The owner keeps a backup of the key. **If the key is lost, installed apps accept no further updates** and users have to update manually once.
+- A local signed build:
 
   ```bash
   cd tauri
@@ -39,6 +39,6 @@ Aplikace nabízí aktualizace jen ze zveřejněných vydání. Návrh ani samotn
   npm run tauri build
   ```
 
-## Ruční build bez vydání
+## Manual build without a release
 
-Ručně spuštěný workflow (*Actions → Build & release → Run workflow*) sestaví stejné instalátory jako artefakty a vydání nezakládá.
+A manual run (*Actions → Build & release → Run workflow*) builds the same installers as workflow artifacts and creates no release.

@@ -1,85 +1,87 @@
-# Architektura
+# Architecture
 
-Simple ADB tools je aplikace na [Tauri 2](https://tauri.app): UI v Reactu a TypeScriptu běží ve WebView, tenký backend v Rustu spouští nástroje a pracuje se soubory. Veškerá logika aplikace (fronta instalací, Wi‑Fi obnova, toolset) je ve frontendu.
+Simple ADB tools is a [Tauri 2](https://tauri.app) app: the React + TypeScript UI runs in a WebView, and a thin Rust backend runs tools and touches files. All app logic (install queue, Wi‑Fi recovery, toolset) lives in the frontend.
 
 ```
 tauri/
 ├── src/                     React + TypeScript
-│   ├── App.tsx              start aplikace, hlavička, záložky, drag & drop, klávesové zkratky
-│   ├── i18n/                texty UI: cs.ts (zdroj tvaru), en.ts, přepínání jazyka
-│   ├── lib/                 čisté funkce bez Tauri (parsery, formátování, verze, changelog) + testy
-│   ├── state/               zustand store pro každou oblast
-│   ├── views/               jedna komponenta na záložku
-│   └── components/          sdílené UI (ui.tsx) a log
+│   ├── App.tsx              startup, header, tabs, drag & drop, keyboard shortcuts
+│   ├── i18n/                UI texts: cs.ts (defines the shape), en.ts, language switching
+│   ├── lib/                 pure functions without Tauri (parsers, formatting, versions, changelog) + tests
+│   ├── state/               one zustand store per area
+│   ├── views/               one component per tab
+│   └── components/          shared UI (ui.tsx) and the log
 └── src-tauri/               Rust backend
-    ├── src/proc.rs          spouštění adb/aapt2/scrcpy, streamování výstupu
-    ├── src/toolchain.rs     detekce a stažení nástrojů
-    ├── src/net.rs           TCP sonda pro diagnostiku Wi‑Fi
-    ├── src/files.rs         seznam APK, systémové cesty, zápis souborů
-    ├── src/lib.rs           pluginy, příkazy, otevírání souborů („Otevřít v“), updater
-    ├── nsis/Czech.nsh       české texty instalátoru (Tauri je nemá)
-    └── tauri.conf.json      okno, bundle, asociace .apk, updater
+    ├── src/proc.rs          runs adb/aapt2/scrcpy, streams output
+    ├── src/toolchain.rs     tool detection and downloads
+    ├── src/net.rs           TCP probe for Wi‑Fi diagnostics
+    ├── src/files.rs         APK listing, system paths, file writes
+    ├── src/i18n.rs          language of backend messages
+    ├── src/lib.rs           plugins, commands, "Open with" files, updater
+    ├── nsis/Czech.nsh       Czech installer strings (Tauri ships none)
+    └── tauri.conf.json      window, bundle, .apk association, updater
 ```
 
 ## Backend (Rust)
 
-Backend spouští jen tři binárky: `adb`, `aapt2` a `scrcpy`. Webview nemůže spustit nic jiného.
+The backend runs only three binaries: `adb`, `aapt2` and `scrcpy`. The WebView cannot start anything else.
 
-| Příkaz | Účel |
+| Command | Purpose |
 |---|---|
-| `toolchain_check` | Najde nástroje (vlastní cesta, Android SDK, PATH, Homebrew, složka aplikace) a ověří je spuštěním `version`. |
-| `toolchain_install` | Stáhne nástroj z oficiálního zdroje do `<app data>/tools`. Průběh posílá událostí `install-progress`. scrcpy ověřuje proti `SHA256SUMS.txt`. |
-| `run_tool` | Jednorázové spuštění s volitelným limitem (`status -2` = vypršel). |
-| `run_tool_to_file` | Binární stdout do souboru (screenshot přes `exec-out screencap`). |
-| `stream_tool` / `stop_stream` | Dlouhé procesy (logcat, scrcpy, instalace). Řádky chodí po dávkách (`proc-lines`), konec jako `proc-exit`. `interrupt` posílá na Unixu SIGINT, aby scrcpy a screenrecord dokončily soubor. |
-| `probe_tcp` | Připojení z aplikace samotné: `reachable` / `refused` / `blocked` / `timeout`. |
-| `list_apks`, `system_paths`, `write_text`, `make_dir`, `path_exists`, `take_pending_files` | Soubory a APK otevřené přes systém. |
+| `toolchain_check` | Finds the tools (custom path, Android SDK, PATH, Homebrew, app folder) and verifies them by running `version`. |
+| `toolchain_install` | Downloads a tool from its official source into `<app data>/tools`, reporting progress via the `install-progress` event. scrcpy is verified against `SHA256SUMS.txt`. |
+| `run_tool` | One-shot run with an optional timeout (`status -2` = timed out). |
+| `run_tool_to_file` | Binary stdout into a file (screenshots via `exec-out screencap`). |
+| `stream_tool` / `stop_stream` | Long-running processes (logcat, scrcpy, installs). Lines arrive in batches (`proc-lines`), the end as `proc-exit`. `interrupt` sends SIGINT on Unix so scrcpy and screenrecord finish their files. |
+| `probe_tcp` | A connection attempt from the app itself: `reachable` / `refused` / `blocked` / `timeout`. |
+| `set_locale` | Language of user-facing backend errors. |
+| `list_apks`, `system_paths`, `write_text`, `make_dir`, `path_exists`, `take_pending_files` | Files, and APKs opened through the OS. |
 
-Platformní detaily:
+Platform details:
 
-- **Windows**: procesy běží s `CREATE_NO_WINDOW`, aby neblikala konzole.
-- **scrcpy** dostává `ADB=<cesta k našemu adb>`. Dvě různé verze adb by si navzájem zabíjely server.
-- **„Otevřít v“**: macOS posílá `RunEvent::Opened`, Windows argumenty příkazové řádky. Druhé spuštění přesměruje single-instance plugin do běžícího okna.
+- **Windows**: processes run with `CREATE_NO_WINDOW` so no console window flashes.
+- **scrcpy** gets `ADB=<path to our adb>`. Two different adb versions would keep killing each other's server.
+- **"Open with"**: macOS sends `RunEvent::Opened`, Windows passes command-line arguments. A second launch is forwarded to the running window by the single-instance plugin.
 
 ## Frontend
 
-| Store | Obsah |
+| Store | Holds |
 |---|---|
-| `app` | aktivní záložka, systémové cesty, verze aplikace |
-| `toolchain` | stav nástrojů a jejich instalace |
-| `installer` | zařízení, sledované složky, info o APK (`aapt2`), verze v telefonu, fronta instalací, poslední instalace |
-| `recentApps` | naposledy nainstalované aplikace v zařízení (`pm list packages -3` + `dumpsys package packages`) |
-| `toolset` | sekce ADB toolsetu (přehled, aplikace, logcat, ovládání, Wi‑Fi, vývojář, shell) |
-| `wireless` | známá Wi‑Fi zařízení, automatické obnovení, diagnostika místní sítě |
-| `mirror` | běžící okna scrcpy a jejich volby |
-| `updates` | kontrola a instalace aktualizací |
-| `log` | sdílený log, přežije znovunačtení WebView (sessionStorage) |
-| `i18n` | zvolený jazyk (`system` / `cs` / `en`) a jazyk, který z něj plyne |
+| `app` | active tab, system paths, app version |
+| `toolchain` | tool status and installs |
+| `installer` | devices, watched folders, APK info (`aapt2`), installed versions, install queue, last install |
+| `recentApps` | recently installed apps on a device (`pm list packages -3` + `dumpsys package packages`) |
+| `toolset` | ADB toolset sections (overview, apps, logcat, control, Wi‑Fi, developer, shell) |
+| `wireless` | known Wi‑Fi devices, auto-reconnect, local network diagnostics |
+| `mirror` | running scrcpy windows and their options |
+| `updates` | update check and install |
+| `log` | shared log, survives a WebView reload (sessionStorage) |
+| `i18n` | chosen language (`system` / `cs` / `en`) and the resolved one |
 
-## Jazyky
+Settings live in `localStorage` (`lib/storage.ts`) and every read has a default.
 
-- Texty jsou v `src/i18n/cs.ts` a `en.ts`. Typ `Messages` vychází z češtiny, takže angličtině nesmí chybět žádný klíč ani parametr. Texty s parametry jsou funkce (`installing: (title) => …`), skloňování řeší každý jazyk ve své funkci.
-- Komponenty používají `useT()`, stores `tr()`. `App` odebírá jazyk, takže přepnutí překreslí celý strom. Informace o zařízení se po přepnutí načtou znovu (`toolset.relocalize`).
-- Výchozí je jazyk systému: první podporovaný jazyk z `navigator.languages`, slovenština dostane češtinu, ostatní angličtinu.
-- Backend drží jazyk v `i18n.rs` (`set_locale`) a podle něj vrací chybové hlášky.
-- Changelog je v `CHANGELOG.md` (česky) a `CHANGELOG.en.md`. Poznámky k vydání obsahují oba jazyky oddělené `<!-- cs -->` a aplikace ukáže ten svůj (`localizedNotes`).
-- macOS dialog o místní síti je lokalizovaný přes `locales/*.lproj/InfoPlist.strings`, instalátor pro Windows přes NSIS (`nsis/Czech.nsh`).
+## Languages
 
-Nastavení se ukládá do `localStorage` (`lib/storage.ts`) a každé čtení má výchozí hodnotu.
+- Texts live in `src/i18n/cs.ts` and `en.ts`. The `Messages` type comes from the Czech file, so English cannot miss a key or a parameter. Texts with parameters are functions (`installing: (title) => …`); each language handles its own plurals.
+- Components use `useT()`, stores use `tr()`. `App` subscribes to the language, so a switch re-renders the whole tree. Device info reloads after a switch (`toolset.relocalize`).
+- The default is the system language: the first supported entry of `navigator.languages`; Slovak gets Czech, everything else English.
+- The backend keeps the language in `i18n.rs` (`set_locale`) and returns errors in it.
+- The changelog lives in `CHANGELOG.md` (Czech) and `CHANGELOG.en.md`. Release notes carry both languages separated by `<!-- cs -->` and the app shows its own (`localizedNotes`).
+- The macOS Local Network prompt is localized via `locales/*.lproj/InfoPlist.strings`, the Windows installer via NSIS (`nsis/Czech.nsh`).
 
-## Chování, na kterém záleží
+## Behaviour that matters
 
-- **Restart adb serveru shodí Wi‑Fi spojení.** Fronta proto před restartem znovu načte zařízení a restartuje, jen když opravdu žádné nevidí.
-- **Místní síť na macOS** patří procesu, který adb server spustil. Když telefon odpovídá aplikaci, ale ne adb serveru, `wireless.diagnose` restartuje server pod aplikací.
-- **Wi‑Fi port na Androidu 11+** se po každém zapnutí ladění mění. Obnova ho hledá přes `adb mdns services` podle `ro.serialno`.
-- **Systémové aplikace** se odebírají jen pro aktuálního uživatele (`pm uninstall -k --user 0`) a jdou vrátit přes `cmd package install-existing`.
-- **Selektory zustand** nesmí vracet nově vytvořené pole nebo objekt. React pak padá na nekonečnou smyčku překreslování.
+- **Restarting the adb server drops Wi‑Fi connections.** The queue therefore re-reads devices first and restarts only when it really sees none.
+- **macOS Local Network access** belongs to the process that started the adb server. When the phone answers the app but not the adb server, `wireless.diagnose` restarts the server under the app.
+- **The Wi‑Fi port on Android 11+** changes every time debugging is turned on. Recovery finds it via `adb mdns services` by `ro.serialno`.
+- **System apps** are removed for the current user only (`pm uninstall -k --user 0`) and can be restored with `cmd package install-existing`.
+- **zustand selectors** must not return a freshly created array or object; React then loops re-rendering forever.
 
-## Testy a CI
+## Tests and CI
 
-- `tauri/src/lib/*.test.ts`: parsery na reálných výstupech adb, aapt2 a dumpsys, verze, changelog (včetně shody obou jazyků), formátování, cesty.
-- `tauri/src/i18n/i18n.test.ts`: stejné klíče a parametry v češtině i angličtině, žádné prázdné texty, výběr jazyka podle systému.
-- `cargo test`: řazení verzí, výběr APK z argumentů, rozbalování ZIP (včetně ochrany proti path traversal), TCP sonda.
-- `scripts/check-secrets.py` hledá tajné údaje: v pre-commit hooku ve staged souborech, v CI v celém repozitáři a v sestaveném frontendu, který se balí do aplikace.
-- `.github/workflows/ci.yml` běží na PR a push do `main` (pushe do feature větví pokrývá jejich PR): kontrola tajných údajů, typy, testy, build frontendu, kontrola changelogu, `cargo fmt`, `clippy` a testy na Linuxu i Windows.
-- `.github/workflows/release.yml` staví instalátory jen při vydání: push do `main` s verzí bez tagu. Viz [RELEASING.md](RELEASING.md).
+- `tauri/src/lib/*.test.ts`: parsers on real adb, aapt2 and dumpsys output, versions, changelog (incl. parity of both languages), formatting, paths.
+- `tauri/src/i18n/i18n.test.ts`: same keys and parameters in Czech and English, no empty texts, system language selection.
+- `cargo test`: version sorting, APK argument filtering, ZIP extraction (incl. path traversal protection), TCP probe, backend language.
+- `scripts/check-secrets.py` looks for credentials: in staged files (pre-commit hook), in the whole repository and in the bundled frontend (CI).
+- `.github/workflows/ci.yml` runs on pull requests and pushes to `main`: secret scan, types, tests, frontend build, changelog check, `cargo fmt`, `clippy` and tests on Linux and Windows.
+- `.github/workflows/release.yml` builds installers only for a release: a push to `main` whose version has no tag yet. See [RELEASING.md](RELEASING.md).
