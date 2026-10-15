@@ -4,6 +4,7 @@
 
 [![CI](https://github.com/cheetumen52/simple-adb-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/cheetumen52/simple-adb-tools/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/cheetumen52/simple-adb-tools)](https://github.com/cheetumen52/simple-adb-tools/releases/latest)
+[![License](https://img.shields.io/github/license/cheetumen52/simple-adb-tools)](LICENSE)
 
 ## Supported languages
 
@@ -74,7 +75,15 @@ A pre-commit hook (`.githooks/pre-commit`) blocks commits that contain private k
 python3 scripts/check-secrets.py --all   # scan every tracked file
 ```
 
-Architecture and the release process are documented in [`docs/`](docs/) (Czech); version history is in [`CHANGELOG.en.md`](CHANGELOG.en.md) (English) and [`CHANGELOG.md`](CHANGELOG.md) (Czech).
+Architecture and the release process are documented in [`docs/`](docs/); version history is in [`CHANGELOG.en.md`](CHANGELOG.en.md) (English) and [`CHANGELOG.md`](CHANGELOG.md) (Czech).
+
+## Contributing
+
+Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md); security issues go through [SECURITY.md](SECURITY.md).
+
+### How it's built
+
+Simple ADB tools started as a shortcut for installing test builds from a MacBook and grew from there. It is developed AI-first: most of the code is written with [Claude Code](https://claude.com/claude-code) and reviewed, tested on real devices and released by the maintainer.
 
 ## Contributors
 
@@ -84,5 +93,9 @@ Architecture and the release process are documented in [`docs/`](docs/) (Czech);
 ## Support
 
 Simple ADB tools is free. If it saves you time, you can chip in at [paypal.me/cheetumen52](https://paypal.me/cheetumen52). Report bugs and ideas via [hejzlar-development.cz](https://hejzlar-development.cz) or [Issues](https://github.com/cheetumen52/simple-adb-tools/issues).
+
+## License
+
+[GNU General Public License v3.0 or later](LICENSE). You may use, study, share and modify the app; distributed changes must stay under the same license.
 
 © 2026 Hejzlar Development

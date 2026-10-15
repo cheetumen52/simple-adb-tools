@@ -1,6 +1,7 @@
 [package]
 name = "simple-adb-tools"
 version = "1.2.1"
+license = "GPL-3.0-or-later"
 description = "Simple ADB tools – instalace APK a každodenní práce s adb"
 authors = ["Hejzlar Development"]
 edition = "2024"

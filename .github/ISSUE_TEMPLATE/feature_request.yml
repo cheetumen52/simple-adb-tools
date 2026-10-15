@@ -1,0 +1,21 @@
+name: Feature request
+description: An idea that would make everyday adb work easier
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task or annoyance behind the idea.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could the app help?
+  - type: textarea
+    id: adb
+    attributes:
+      label: adb commands you use today
+      description: If you do it by hand now, the commands help a lot.
+      render: shell
