@@ -414,3 +414,7 @@ details.trace pre { margin: 8px 0 0; max-height: 260px; overflow: auto; font-siz
 .file-row:hover .file-actions, .file-actions:focus-within { opacity: 1; }
 .files-list { transition: border-color 0.15s, background 0.15s; }
 .files-list.drop-over { border-color: var(--accent); background: rgba(1, 181, 213, 0.06); }
+.macro { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.subtab.toggle svg { color: var(--text-muted); }
+.subtab.toggle.active svg { color: var(--accent); }
+.subtab:disabled { opacity: 0.4; cursor: default; }

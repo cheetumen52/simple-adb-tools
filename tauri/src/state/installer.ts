@@ -24,6 +24,8 @@ import { load, save } from "../lib/storage";
 import { log } from "./log";
 import { useApp } from "./app";
 import { toolReady, useToolchain } from "./toolchain";
+import { useMirror } from "./mirror";
+import { useToolset } from "./toolset";
 import { locale, tr } from "../i18n";
 
 export interface DeviceDetails {
@@ -54,6 +56,17 @@ export interface LastInstalled {
 
 export type AppAction = "launch" | "restart" | "stop" | "settings" | "clearData";
 
+/** What happens after a successful install; persisted. */
+export interface AfterInstall {
+  launch: boolean;
+  /** `adb install -g`: grant every runtime permission up front. */
+  grant: boolean;
+  logcat: boolean;
+  mirror: boolean;
+}
+export type AfterInstallStep = keyof AfterInstall;
+export const AFTER_INSTALL_STEPS: AfterInstallStep[] = ["launch", "grant", "logcat", "mirror"];
+
 interface InstallerState {
   devices: Device[];
   selected: string[];
@@ -71,7 +84,7 @@ interface InstallerState {
   reinstallMode: boolean;
   watchedFolders: string[];
   autoInstall: boolean;
-  launchAfterInstall: boolean;
+  afterInstall: AfterInstall;
   lastInstalled: LastInstalled | null;
 
   start: () => Promise<void>;
@@ -86,7 +99,8 @@ interface InstallerState {
   scanApks: () => Promise<void>;
   addFolder: () => Promise<void>;
   removeFolder: (path: string) => void;
-  setOption: (key: "reinstallMode" | "autoInstall" | "launchAfterInstall", value: boolean) => void;
+  setOption: (key: "reinstallMode" | "autoInstall", value: boolean) => void;
+  setAfterInstall: (step: AfterInstallStep, on: boolean) => void;
   enqueueInstall: (files: string[], reinstall: boolean) => void;
   enqueueUninstall: (pkg: string) => void;
   dismissFailure: () => void;
@@ -268,7 +282,8 @@ async function installOne(device: Device, file: string, pkg: string | null, rein
     }
   }
 
-  const attempts = [["install", "-r", "-d"], ["install"], ["install", "-r", "-d"]];
+  const grant = get().afterInstall.grant ? ["-g"] : [];
+  const attempts = [["install", "-r", "-d", ...grant], ["install", ...grant], ["install", "-r", "-d", ...grant]];
   let lastOutput = "";
   for (let i = 0; i < attempts.length; i++) {
     if (i > 0) {
@@ -279,7 +294,7 @@ async function installOne(device: Device, file: string, pkg: string | null, rein
     const r = await streamToEnd("adb", ["-s", device.serial, ...attempts[i], file], out);
     if (r.status === 0 && r.output.includes("Success")) {
       log("success", `✓ ${name} → ${label}`);
-      if (get().launchAfterInstall && pkg) {
+      if (get().afterInstall.launch && pkg) {
         log("command", `${tr().actions.launch} ${pkg} → ${label}`);
         await adb(["-s", device.serial, "shell", "monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"], 20000);
       }
@@ -292,6 +307,20 @@ async function installOne(device: Device, file: string, pkg: string | null, rein
   set({ failureHint: hint });
   log("error", `✗ ${name} → ${label}: ${tr().failures[hint.reason]}`);
   return false;
+}
+
+/** Logcat and mirroring steps of the after-install macro (launch and grant happen inside the install). */
+async function runMacro(pkg: string, devices: Device[]) {
+  const steps = get().afterInstall;
+  if (steps.mirror) for (const d of devices) void useMirror.getState().start(d);
+  if (steps.logcat && devices[0]) {
+    const toolset = useToolset.getState();
+    if (toolset.logcatRunning) toolset.stopLogcat();
+    toolset.set({ serial: devices[0].serial, logcatPackage: pkg, section: "logcat" });
+    useApp.getState().setTab("toolset");
+    // The app was just launched; give it a moment to get a pid for the logcat filter.
+    window.setTimeout(() => void useToolset.getState().startLogcat(), 800);
+  }
 }
 
 async function updateBadge() {
@@ -344,6 +373,7 @@ async function runJob(job: Job) {
           );
           const installedOn = devices.filter((_, i) => results[i]).map(displayName);
           ok = results.every(Boolean) && ok;
+          if (pkg && installedOn.length) void runMacro(pkg, devices.filter((_, i) => results[i]));
           if (details && installedOn.length) {
             const last = { pkg: details.pkg, label: details.label, version: apkVersion(details), file, devices: installedOn, at: Date.now() };
             set({ lastInstalled: last });
@@ -404,7 +434,8 @@ export const useInstaller = create<InstallerState>(() => ({
   reinstallMode: false,
   watchedFolders: load<string[]>("watchedFolders", []),
   autoInstall: load("autoInstall", false),
-  launchAfterInstall: load("launchAfterInstall", true),
+  // Older versions stored only the launch switch.
+  afterInstall: { launch: load("launchAfterInstall", true), grant: false, logcat: false, mirror: false, ...load<Partial<AfterInstall>>("afterInstall", {}) },
   lastInstalled: load<LastInstalled | null>("lastInstalled", null),
 
   start: async () => {
@@ -512,6 +543,12 @@ export const useInstaller = create<InstallerState>(() => ({
   setOption: (key, value) => {
     set({ [key]: value });
     if (key !== "reinstallMode") save(key, value);
+  },
+
+  setAfterInstall: (step, on) => {
+    const afterInstall = { ...get().afterInstall, [step]: on };
+    set({ afterInstall });
+    save("afterInstall", afterInstall);
   },
 
   enqueueInstall: (files, reinstall) => {

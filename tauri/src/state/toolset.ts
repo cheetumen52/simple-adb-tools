@@ -478,7 +478,12 @@ export const useToolset = create<ToolsetState>((set) => ({
     const args = ["-s", d.serial, "logcat", "-v", "time", "-T", "300"];
     const pkg = get().logcatPackage.trim();
     if (pkg) {
-      const pid = (await shell(d, `pidof ${shQuote(pkg)}`)).output.trim().split(" ")[0];
+      // A just-launched app needs a moment before it has a pid.
+      let pid = "";
+      for (let i = 0; i < 6 && (!pid || Number.isNaN(Number(pid))); i++) {
+        if (i) await new Promise((r) => setTimeout(r, 500));
+        pid = (await shell(d, `pidof ${shQuote(pkg)}`)).output.trim().split(" ")[0];
+      }
       if (!pid || Number.isNaN(Number(pid))) {
         log("error", tr().toolset.logs.notRunning(pkg));
         return;

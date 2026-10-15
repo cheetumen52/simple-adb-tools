@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { recentDevice, useRecentApps, type RecentAction } from "../state/recentApps";
 import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
-import { AlignLeft, BatteryMedium, Eraser, Play, RefreshCcw, Settings, Square, Trash2 } from "lucide-react";
+import { AlignLeft, BatteryMedium, Check, Eraser, Play, Plus, RefreshCcw, Settings, Square, Trash2 } from "lucide-react";
 import { useToolset } from "../state/toolset";
 import { latestCrash, useCrashes } from "../state/crashes";
 import { Cable, Camera, Folder, Monitor, MonitorSmartphone, MonitorX, MoreHorizontal, OctagonX, Package, RefreshCw, RotateCw, Smartphone, Wifi, WifiOff, Wrench, X } from "lucide-react";
@@ -9,7 +9,7 @@ import { apkVersion, displayName, isEmulator, isReady, isWireless, type Device }
 import { bytes, timeAgo } from "../lib/format";
 import { tabNumber, useApp } from "../state/app";
 import { useToolchain } from "../state/toolchain";
-import { apkInfo, apkKey, canInstall, comparison, targets, useInstaller } from "../state/installer";
+import { AFTER_INSTALL_STEPS, apkInfo, apkKey, canInstall, comparison, targets, useInstaller } from "../state/installer";
 import { reconnectingDevices, useWireless } from "../state/wireless";
 import { useMirror } from "../state/mirror";
 import { useDrag } from "../state/drag";
@@ -458,7 +458,8 @@ function LastAppSection() {
 }
 
 export function InstallView() {
-  const { reinstallMode, launchAfterInstall, autoInstall, setOption } = useInstaller();
+  const { reinstallMode, afterInstall, autoInstall, setOption, setAfterInstall } = useInstaller();
+  const scrcpyReady = useToolchain((s) => s.scrcpy.kind === "found");
   const m = useT().install;
   return (
     <>
@@ -474,8 +475,25 @@ export function InstallView() {
           <DropZone />
           <div className="row wrap" style={{ gap: 20 }}>
             <Switch label={m.reinstallOption} title={m.reinstallOptionHelp} checked={reinstallMode} onChange={(v) => setOption("reinstallMode", v)} />
-            <Switch label={m.launchAfter} checked={launchAfterInstall} onChange={(v) => setOption("launchAfterInstall", v)} />
+
             <Switch label={m.autoInstall} title={m.autoInstallHelp} checked={autoInstall} onChange={(v) => setOption("autoInstall", v)} />
+          </div>
+          <div className="macro">
+            <Kicker muted>{m.afterInstall}</Kicker>
+            <div className="subnav" style={{ flexWrap: "wrap" }}>
+              {AFTER_INSTALL_STEPS.map((step) => (
+                <button
+                  key={step}
+                  className={`subtab toggle${afterInstall[step] ? " active" : ""}`}
+                  title={m.afterHelp[step]}
+                  disabled={step === "mirror" && !scrcpyReady}
+                  onClick={() => setAfterInstall(step, !afterInstall[step])}
+                >
+                  {afterInstall[step] ? <Check size={12} /> : <Plus size={12} />}
+                  {m.afterSteps[step]}
+                </button>
+              ))}
+            </div>
           </div>
           <FailureBanner />
           <LastAppSection />
