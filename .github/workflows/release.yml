@@ -1,10 +1,11 @@
 name: Build & release (Tauri)
 
-# Tag push (v1.2.3) builds installers and attaches them to a draft GitHub release.
-# Manual run builds the same installers and keeps them as workflow artifacts.
+# Installers are built only for a release: a push to main whose app version has no tag yet
+# (i.e. a merged release PR) gets tagged and becomes a draft GitHub release to publish.
+# Other pushes to main stop after the version check. A manual run builds workflow artifacts only.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -12,14 +13,49 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          tag="v$(node -p "require('./tauri/package.json').version")"
+          release=false
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && ! git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            release=true
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "### $tag: $([ "$release" = true ] && echo 'new version, building a release' || echo 'no release')" >> "$GITHUB_STEP_SUMMARY"
+
   ci:
+    needs: version
+    if: needs.version.outputs.release == 'true' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/ci.yml
 
+  tag:
+    # Tagging before the build means a re-run (or a later push) never builds the same version twice.
+    needs: [version, ci]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ needs.version.outputs.tag }}" -m "Simple ADB tools ${{ needs.version.outputs.tag }}"
+          git push origin "${{ needs.version.outputs.tag }}"
+
   build:
-    needs: ci
+    needs: [version, ci, tag]
+    # `always()` lets a manual run skip the tag job; the explicit results keep failures blocking.
+    if: always() && needs.ci.result == 'success' && (needs.tag.result == 'success' || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -61,11 +97,7 @@ jobs:
         id: notes
         shell: bash
         run: |
-          version="v$(node -p "require('./tauri/package.json').version")"
-          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match app version $version"
-            exit 1
-          fi
+          version="${{ needs.version.outputs.tag }}"
           py="$(command -v python3 || command -v python)"
           {
             echo "body<<NOTES_EOF"
@@ -83,8 +115,8 @@ jobs:
           includeUpdaterJson: false
           projectPath: tauri
           args: ${{ matrix.args }}
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-          releaseName: Simple ADB tools ${{ github.ref_name }}
+          tagName: ${{ needs.version.outputs.release == 'true' && needs.version.outputs.tag || '' }}
+          releaseName: Simple ADB tools ${{ needs.version.outputs.tag }}
           releaseBody: |
             ${{ steps.notes.outputs.body }}
 
@@ -99,7 +131,7 @@ jobs:
           prerelease: false
 
       - name: Upload installers as artifacts
-        if: github.ref_type != 'tag'
+        if: needs.version.outputs.release != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: simple-adb-tools-${{ matrix.platform }}-${{ matrix.rust-targets || 'x64' }}
@@ -113,8 +145,8 @@ jobs:
 
   updater-manifest:
     # Builds latest.json for the in-app updater from the signatures every platform uploaded.
-    needs: build
-    if: github.ref_type == 'tag'
+    needs: [version, build]
+    if: needs.version.outputs.release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -122,7 +154,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.version.outputs.tag }}
         run: |
           mkdir sigs
           gh release download "$TAG" --repo "$REPO" --pattern '*.sig' --dir sigs

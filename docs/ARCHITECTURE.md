@@ -81,5 +81,5 @@ Nastavení se ukládá do `localStorage` (`lib/storage.ts`) a každé čtení m�
 - `tauri/src/i18n/i18n.test.ts`: stejné klíče a parametry v češtině i angličtině, žádné prázdné texty, výběr jazyka podle systému.
 - `cargo test`: řazení verzí, výběr APK z argumentů, rozbalování ZIP (včetně ochrany proti path traversal), TCP sonda.
 - `scripts/check-secrets.py` hledá tajné údaje: v pre-commit hooku ve staged souborech, v CI v celém repozitáři a v sestaveném frontendu, který se balí do aplikace.
-- `.github/workflows/ci.yml` běží na každý push a PR: kontrola tajných údajů, typy, testy, build frontendu, kontrola changelogu, `cargo fmt`, `clippy` a testy na Linuxu i Windows.
-- `.github/workflows/release.yml` nejdřív spustí CI, pak sestaví instalátory. Viz [RELEASING.md](RELEASING.md).
+- `.github/workflows/ci.yml` běží na PR a push do `main` (pushe do feature větví pokrývá jejich PR): kontrola tajných údajů, typy, testy, build frontendu, kontrola changelogu, `cargo fmt`, `clippy` a testy na Linuxu i Windows.
+- `.github/workflows/release.yml` staví instalátory jen při vydání: push do `main` s verzí bez tagu. Viz [RELEASING.md](RELEASING.md).
