@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlignLeft, ArrowUpFromLine, Cable, Camera, ChevronLeft, Circle, Eraser, Eye, FileDown, Home, Info, Layers, LayoutGrid,
   Lock, MonitorSmartphone, Network, Pause, Play, Power, RefreshCw, Save, Settings, Square, Sun, Terminal, Trash2, Undo2, Volume1, Volume2,
-  Wifi, WifiOff, Hand, Bug, FlaskConical, FolderOpen,
+  Wifi, WifiOff, Hand, Bug, FlaskConical, FolderOpen, Link,
 } from "lucide-react";
 import { displayName, isEmulator, isReady, isWireless } from "../lib/parse";
 import { tabNumber, useApp } from "../state/app";
@@ -13,6 +13,7 @@ import { useCrashes } from "../state/crashes";
 import { CrashesSection } from "./toolset/CrashesSection";
 import { TestingSection } from "./toolset/TestingSection";
 import { FilesSection } from "./toolset/FilesSection";
+import { DeepLinksSection } from "./toolset/DeepLinksSection";
 import { DevicePicker, InfoGrid, useDevice } from "./toolset/shared";
 import { knownId, wirelessStatus, useWireless, type KnownWireless, type WirelessState } from "../state/wireless";
 import { MIRROR_SIZES, MIRROR_SOURCES, useMirror, type MirrorSource } from "../state/mirror";
@@ -23,7 +24,7 @@ import { locale, useT, type Messages } from "../i18n";
 import { permissionLabel } from "../lib/devicetools";
 
 const ICONS: Record<ToolsetSection, typeof Info> = {
-  overview: Info, mirror: MonitorSmartphone, files: FolderOpen, apps: LayoutGrid, logcat: AlignLeft, crashes: Bug, control: Hand, wireless: Wifi, testing: FlaskConical, shell: Terminal,
+  overview: Info, mirror: MonitorSmartphone, files: FolderOpen, apps: LayoutGrid, logcat: AlignLeft, crashes: Bug, deeplinks: Link, control: Hand, wireless: Wifi, testing: FlaskConical, shell: Terminal,
 };
 
 function SectionNav() {
@@ -452,18 +453,6 @@ function ControlSection() {
           <div><Button variant="link" onClick={t.openDeveloperOptions}>{c.developerOptions}</Button></div>
         </div>
       </Card>
-      <Card>
-        <div className="stack" style={{ gap: 10 }}>
-          <CardTitle kicker={c.deepLinkKicker} title={c.deepLinkTitle} subtitle={c.deepLinkSubtitle} />
-          <div className="row">
-            <TextField placeholder={c.deepLinkPlaceholder} value={t.deepLink} onChange={(v) => t.set({ deepLink: v })} onSubmit={() => t.openDeepLink()} />
-            <Button variant="primary" small disabled={!t.deepLink} onClick={() => t.openDeepLink()}>{m.common.open}</Button>
-          </div>
-          {t.deepLinkHistory.map((link) => (
-            <button key={link} className="btn plain mono-sm" style={{ justifyContent: "flex-start" }} onClick={() => { t.set({ deepLink: link }); t.openDeepLink(link); }}>↺ {link}</button>
-          ))}
-        </div>
-      </Card>
     </div>
   );
 }
@@ -642,6 +631,7 @@ export function ToolsetView() {
       case "files": return <FilesSection />;
       case "apps": return <AppsSection />;
       case "crashes": return <CrashesSection />;
+      case "deeplinks": return <DeepLinksSection />;
       case "control": return <ControlSection />;
       case "wireless": return <WirelessSection />;
       case "testing": return <TestingSection />;
