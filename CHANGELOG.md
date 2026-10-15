@@ -14,6 +14,8 @@ Všechny podstatné změny Simple ADB tools. Anglická verze je v [CHANGELOG.en.
 - Sekce Deep linky: odkazy s intent extras (text, int, long, float, bool), cílovou aplikací a uložením pro opakované testy. Schémata a odkazy aplikace se vyčtou přímo z manifestu, otevírat jde i na všech zařízeních najednou.
 
 ### Změněno
+- Přehled zařízení má dlaždice s Androidem, baterií, úložištěm a displejem, baterie a úložiště i s ukazatelem.
+- Log jde sbalit do jednoho řádku s poslední zprávou, stav si aplikace pamatuje.
 - Deep linky se přestěhovaly z Ovládání do vlastní sekce.
 - Instalace a odinstalace běží na všech vybraných zařízeních paralelně a u každého je vidět průběh. Výpis v logu nese název zařízení.
 - Sekce Vývojář je teď součástí sekce Testování.

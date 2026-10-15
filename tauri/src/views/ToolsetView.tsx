@@ -58,7 +58,7 @@ function SectionNav() {
 /* ---------- Overview ---------- */
 
 function OverviewSection() {
-  const { info, loadingInfo, loadInfo, reboot } = useToolset();
+  const { info, stats, loadingInfo, loadInfo, reboot } = useToolset();
   const device = useDevice();
   const over = useDrag((s) => s.over) === "push";
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
@@ -81,6 +81,20 @@ function OverviewSection() {
             {loadingInfo && <Spinner />}
             <Button small icon={<RefreshCw size={13} />} onClick={() => void loadInfo()}>{t.common.refresh}</Button>
           </div>
+          {stats.length > 0 && (
+            <div className="stats">
+              {stats.map((s) => (
+                <div key={s.label} className="stat">
+                  <span className="kicker muted">{s.label}</span>
+                  <span className="stat-value">{s.value}</span>
+                  {s.fraction != null && (
+                    <div className={`stat-bar${s.warn ? " warn" : ""}`}><div style={{ width: `${Math.round(s.fraction * 100)}%` }} /></div>
+                  )}
+                  <span className="caption truncate">{s.sub || "\u00a0"}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <InfoGrid rows={info} />
         </div>
       </Card>
@@ -88,7 +102,7 @@ function OverviewSection() {
         <Card>
           <div className="stack" style={{ gap: 10 }}>
             <CardTitle kicker={m.filesKicker} title={m.pushTitle} subtitle={m.pushSubtitle} />
-            <div className={`dropzone${over ? " active" : ""}`} style={{ height: 64 }} data-drop="push">
+            <div className={`dropzone${over ? " active" : ""}`} style={{ minHeight: 64 }} data-drop="push">
               <span className="row caption secondary"><ArrowUpFromLine size={14} /> {m.pushDrop}</span>
             </div>
           </div>

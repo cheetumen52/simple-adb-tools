@@ -14,6 +14,8 @@ All notable changes to Simple ADB tools. The Czech version is in [CHANGELOG.md](
 - Deep links section: links with intent extras (string, int, long, float, bool), a target app and saving for repeated tests. The app's schemes and links are read straight from its manifest, and links can open on all devices at once.
 
 ### Changed
+- The device overview has tiles for Android, battery, storage and display, with bars for battery and storage.
+- The log collapses into a single line with the latest message; the app remembers the choice.
 - Deep links moved from Control into their own section.
 - Installs and uninstalls run on all selected devices in parallel, with progress for each. Log lines name their device.
 - The Developer section is now part of Testing.

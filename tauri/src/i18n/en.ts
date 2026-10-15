@@ -47,6 +47,8 @@ export const en: Messages = {
     copy: "Copy",
     clear: "Clear",
     empty: "$ waiting for the first APK_",
+    collapse: "Collapse log",
+    expand: "Expand log",
   },
 
   confirm: {
@@ -260,6 +262,8 @@ export const en: Messages = {
       powerKicker: "power",
       rebootCard: "Restart",
       rebootSubtitle: "Normal restart or a flashing mode.",
+      display: "Display",
+      storageUsed: (used, total) => `${used} of ${total}`,
     },
     info: {
       manufacturer: "Manufacturer",

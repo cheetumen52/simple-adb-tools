@@ -46,6 +46,8 @@ export const cs = {
     copy: "Kopírovat",
     clear: "Vymazat",
     empty: "$ čekám na první APK_",
+    collapse: "Sbalit log",
+    expand: "Rozbalit log",
   },
 
   confirm: {
@@ -260,6 +262,8 @@ export const cs = {
       powerKicker: "napájení",
       rebootCard: "Restart",
       rebootSubtitle: "Běžný restart nebo režim pro flashování.",
+      display: "Displej",
+      storageUsed: (used: string, total: string) => `${used} z ${total}`,
     },
     info: {
       manufacturer: "Výrobce",
