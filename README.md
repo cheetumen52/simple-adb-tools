@@ -96,6 +96,6 @@ Simple ADB tools is free. If it saves you time, you can chip in at [paypal.me/ch
 
 ## License
 
-See [LICENSE](LICENSE).
+[GNU General Public License v3.0 or later](LICENSE). You may use, study, share and modify the app; distributed changes must stay under the same license.
 
 © 2026 Hejzlar Development

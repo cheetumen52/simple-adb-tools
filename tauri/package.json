@@ -2,6 +2,7 @@
   "name": "simple-adb-tools",
   "private": true,
   "version": "1.2.1",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "dev": "vite",
