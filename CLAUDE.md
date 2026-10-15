@@ -5,7 +5,7 @@ Tauri 2 aplikace (React + TypeScript v `tauri/src`, Rust v `tauri/src-tauri`) pr
 ## Pravidla práce
 
 - **Každá změna patří do vlastní větve** (`feature/…`, `fix/…`), ne přímo do `main`. Větev pushni a nabídni PR. Merge do `main` dělej jen se souhlasem.
-- **Vydání (tag `v*`, zveřejnění návrhu, mazání nebo přesun tagů) jen po výslovném souhlasu**, i u opravných verzí.
+- **Vydání jen po výslovném souhlasu**, i u opravných verzí. Vydání spustí merge PR se zvýšenou verzí do `main` (workflow sám otaguje a postaví návrh), takže souhlas potřebuje už tenhle merge. Totéž platí pro zveřejnění návrhu a mazání nebo přesun tagů.
 - **Každá uživatelsky viditelná změna jde do obou changelogů** ve stejné větvi: `CHANGELOG.md` česky pod `## [Nevydáno]`, `CHANGELOG.en.md` anglicky pod `## [Unreleased]`. Musí mít stejné verze, data a počty položek (hlídá to test). Changelog se zobrazuje v aplikaci a z obou vzniká text vydání.
 - **README je anglicky**, ostatní dokumentace česky. UI je česky i anglicky.
 - **Push do GitHubu** jde pod účtem `cheetumen52`, ne aktivním účtem `gh`:
