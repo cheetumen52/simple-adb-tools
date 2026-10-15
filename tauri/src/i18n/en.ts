@@ -168,6 +168,7 @@ export const en: Messages = {
     lastEmpty: "After your first install you'll find quick app controls here: launch, restart, logcat and more.",
     pickDevice: "select a device",
     selectAll: "Select all",
+    sameAsUsb: "same phone as on USB",
     selectNone: "Clear selection",
     selectedCount: (n, total) => `${n} of ${total} selected`,
     screenshotSelected: "Screenshot selected",

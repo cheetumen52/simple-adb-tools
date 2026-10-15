@@ -168,6 +168,7 @@ export const cs = {
     lastEmpty: "Po první instalaci tu najdeš rychlé ovládání aplikace: spuštění, restart, logcat a další.",
     pickDevice: "vyber zařízení",
     selectAll: "Vybrat vše",
+    sameAsUsb: "stejný telefon jako přes USB",
     selectNone: "Zrušit výběr",
     selectedCount: (n: number, total: number) => `Vybráno ${n} z ${total}`,
     screenshotSelected: "Screenshot vybraných",

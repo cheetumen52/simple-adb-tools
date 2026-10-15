@@ -6,7 +6,7 @@ import { displayName, isWireless, logcatLevel, packageList, sections, shQuote, t
 import { fileStamp } from "../lib/format";
 import { log } from "./log";
 import { useApp } from "./app";
-import { readyDevices, useInstaller } from "./installer";
+import { physicalDevices, readyDevices, useInstaller } from "./installer";
 import { useWireless } from "./wireless";
 import { useTesting } from "./testing";
 import { useFiles } from "./files";
@@ -163,7 +163,7 @@ export function targetDevices(): Device[] {
   const d = device();
   if (!d) return [];
   const s = get();
-  return s.broadcast && BROADCAST.includes(s.section) ? readyDevices(useInstaller.getState()) : [d];
+  return s.broadcast && BROADCAST.includes(s.section) ? physicalDevices(useInstaller.getState()) : [d];
 }
 
 function runOnDevice(title: string, command: string) {

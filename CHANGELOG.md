@@ -21,6 +21,10 @@ Všechny podstatné změny Simple ADB tools. Anglická verze je v [CHANGELOG.en.
 - Sekce Vývojář je teď součástí sekce Testování.
 - ADB toolset má postranní menu rozdělené do skupin a nadpis s popisem každé sekce. Na úzkém okně zůstanou jen ikony.
 
+### Opraveno
+- Telefon připojený zároveň přes USB a Wi‑Fi se při instalaci, hromadných akcích a hlídání pádů bere jako jedno zařízení (přednost má USB), u Wi‑Fi záznamu je štítek.
+- Po znovunačtení okna nezůstávají běžet procesy logcatu a zrcadlení z předchozího stavu.
+
 ## [1.2.1] - 2026-10-14
 
 ### Opraveno

@@ -49,6 +49,7 @@ export const native = {
   pathExists: (path: string) => invoke<boolean>("path_exists", { path }),
   takePendingFiles: () => invoke<string[]>("take_pending_files"),
   stopStream: (id: string, interrupt = false) => invoke<void>("stop_stream", { id, interrupt }),
+  stopAllStreams: () => invoke<void>("stop_all_streams"),
   /** Language of messages produced by the backend (errors from tool downloads and runs). */
   setLocale: (lang: string) => invoke<void>("set_locale", { lang }),
 };

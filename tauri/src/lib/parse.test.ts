@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   apkVersion,
   compareVersions,
+  distinctDevices,
   displayName,
   isEmulator,
   isReady,
@@ -156,4 +157,16 @@ describe("small helpers", () => {
     expect(logcatLevel("--------- beginning of main")).toBe("I");
   });
 
+});
+
+describe("distinctDevices", () => {
+  it("keeps one entry per phone and prefers USB over Wi-Fi", () => {
+    const devices = parseDevices(`List of devices attached
+192.168.0.102:5555     device product:MAR-LX1AEEA model:MAR_LX1A device:HWMAR transport_id:6
+L2N4C20109011719       device usb:2-1 product:MAR-LX1AEEA model:MAR_LX1A device:HWMAR transport_id:1
+emulator-5554          device product:sdk_gphone16k_arm64 model:sdk_gphone16k_arm64 transport_id:2`);
+    const hw: Record<string, string> = { "192.168.0.102:5555": "L2N4C20109011719", L2N4C20109011719: "L2N4C20109011719" };
+    expect(distinctDevices(devices, (s) => hw[s]).map((d) => d.serial)).toEqual(["L2N4C20109011719", "emulator-5554"]);
+    expect(distinctDevices(devices, () => null)).toHaveLength(3);
+  });
 });

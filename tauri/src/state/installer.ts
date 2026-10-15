@@ -8,7 +8,9 @@ import {
   apkVersion,
   compareVersions,
   displayName,
+  distinctDevices,
   isReady,
+  isWireless,
   parseBadging,
   parseDevices,
   parseDumpsysVersion,
@@ -109,9 +111,21 @@ interface InstallerState {
 
 export const apkKey = (a: ApkEntry) => `${a.path}|${a.modifiedMs}`;
 export const readyDevices = (s: Pick<InstallerState, "devices">) => s.devices.filter(isReady);
-export const targets = (s: Pick<InstallerState, "devices" | "selected">) =>
-  s.devices.filter((d) => isReady(d) && s.selected.includes(d.serial));
-export const canInstall = (s: Pick<InstallerState, "devices" | "selected">) =>
+export const targets = (s: Pick<InstallerState, "devices" | "selected" | "details">) =>
+  distinctDevices(
+    s.devices.filter((d) => isReady(d) && s.selected.includes(d.serial)),
+    (serial) => s.details[serial]?.hardwareSerial,
+  );
+/** Ready devices without the Wi‑Fi duplicates of phones that are also on USB. */
+export const physicalDevices = (s: Pick<InstallerState, "devices" | "details">) =>
+  distinctDevices(readyDevices(s), (serial) => s.details[serial]?.hardwareSerial);
+/** For a Wi‑Fi connection of a phone that is also on USB: the USB device. */
+export const usbTwin = (s: Pick<InstallerState, "devices" | "details">, device: Device) => {
+  const hw = s.details[device.serial]?.hardwareSerial;
+  if (!hw || !isWireless(device)) return null;
+  return s.devices.find((d) => d !== device && !isWireless(d) && isReady(d) && s.details[d.serial]?.hardwareSerial === hw) ?? null;
+};
+export const canInstall = (s: Pick<InstallerState, "devices" | "selected" | "details">) =>
   toolReady("adb") && (readyDevices(s).length === 0 || targets(s).length > 0);
 export const apkInfo = (s: Pick<InstallerState, "info">, apk: ApkEntry) => s.info[apkKey(apk)] ?? null;
 

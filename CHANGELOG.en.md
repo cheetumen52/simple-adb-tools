@@ -21,6 +21,10 @@ All notable changes to Simple ADB tools. The Czech version is in [CHANGELOG.md](
 - The Developer section is now part of Testing.
 - The ADB toolset has a grouped sidebar and a heading with a description for every section. Narrow windows show icons only.
 
+### Fixed
+- A phone connected over USB and Wi‑Fi at once counts as one device for installs, batch actions and crash watch (USB wins), and the Wi‑Fi entry is labelled.
+- Reloading the window no longer leaves logcat or mirroring processes from the previous state running.
+
 ## [1.2.1] - 2026-10-14
 
 ### Fixed

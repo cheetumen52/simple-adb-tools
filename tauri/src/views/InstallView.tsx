@@ -9,7 +9,7 @@ import { apkVersion, displayName, isEmulator, isReady, isWireless, type Device }
 import { bytes, timeAgo } from "../lib/format";
 import { tabNumber, useApp } from "../state/app";
 import { useToolchain } from "../state/toolchain";
-import { AFTER_INSTALL_STEPS, apkInfo, apkKey, canInstall, comparison, targets, useInstaller } from "../state/installer";
+import { AFTER_INSTALL_STEPS, apkInfo, apkKey, canInstall, comparison, targets, usbTwin, useInstaller } from "../state/installer";
 import { reconnectingDevices, useWireless } from "../state/wireless";
 import { useMirror } from "../state/mirror";
 import { useDrag } from "../state/drag";
@@ -27,6 +27,7 @@ function DeviceRow({ device }: { device: Device }) {
   const d = details[device.serial];
   const mirroring = !!mirror.running[device.serial];
   const t = useT();
+  const twin = useInstaller((s) => usbTwin(s, device));
   return (
     <Card compact highlight={ready && isSelected}>
       <div className="row" style={{ gap: 12, cursor: ready ? "pointer" : "default" }} onClick={() => ready && toggleSelected(device.serial)}>
@@ -53,6 +54,7 @@ function DeviceRow({ device }: { device: Device }) {
             <Button small icon={mirroring ? <MonitorX size={14} /> : <MonitorSmartphone size={14} />} onClick={() => mirror.toggle(device)} title={mirroring ? t.install.stopMirror : t.install.mirror} />
           )}
           {ready && <Button small icon={<Camera size={14} />} onClick={() => void screenshot(device)} title={t.install.screenshotHelp} />}
+          {twin && <Pill color="var(--text-muted)" dot={false}>{t.install.sameAsUsb}</Pill>}
           {isEmulator(device) && <Pill color="var(--accent)" dot={false}>{t.common.emulator}</Pill>}
           {device.state === "device" && <Pill>{t.common.connected}</Pill>}
           {device.state === "unauthorized" && <Pill color="var(--warn)">{t.install.confirmUsb}</Pill>}
