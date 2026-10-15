@@ -5,7 +5,7 @@ import { displayName, sections, type Device } from "../lib/parse";
 import { load, save } from "../lib/storage";
 import { tr } from "../i18n";
 import { log } from "./log";
-import { currentDevice, useToolset } from "./toolset";
+import { currentDevice, targetDevices, useToolset } from "./toolset";
 
 export type BatteryAction = "low" | "unplug" | "charging" | "full" | "doze" | "reset";
 
@@ -60,11 +60,9 @@ async function shell(d: Device, title: string, command: string) {
   return r;
 }
 
-/** Runs a change on the current device, then re-reads the state. */
+/** Runs a change on the target devices (all of them while broadcasting), then re-reads the state. */
 async function change(title: string, command: string) {
-  const d = device();
-  if (!d) return;
-  await shell(d, title, command);
+  await Promise.all(targetDevices().map((d) => shell(d, title, command)));
   await get().load();
 }
 
@@ -126,17 +124,18 @@ export const useTesting = create<TestingState>((set) => ({
   },
 
   proxyViaAdb: async () => {
-    const d = device();
     const port = Number(get().proxyPort);
-    if (!d || !port) return;
+    if (!port) return;
     // The phone talks to its own localhost; adb tunnels it to the proxy on this computer, over USB or Wi‑Fi alike.
-    log("command", `adb reverse tcp:${port} tcp:${port} → ${displayName(d)}`);
-    const r = await native.run("adb", ["-s", d.serial, "reverse", `tcp:${port}`, `tcp:${port}`], 15000);
-    if (r.status !== 0) {
-      log("error", r.output.trim());
-      return;
-    }
-    await change(tr().testing.logs.proxy(`127.0.0.1:${port}`), `settings put global http_proxy 127.0.0.1:${port}`);
+    await Promise.all(
+      targetDevices().map(async (d) => {
+        log("command", `adb reverse tcp:${port} tcp:${port} → ${displayName(d)}`);
+        const r = await native.run("adb", ["-s", d.serial, "reverse", `tcp:${port}`, `tcp:${port}`], 15000);
+        if (r.status !== 0) log("error", r.output.trim());
+        else await shell(d, tr().testing.logs.proxy(`127.0.0.1:${port}`), `settings put global http_proxy 127.0.0.1:${port}`);
+      }),
+    );
+    await get().load();
   },
 
   proxyViaLan: async (host) => {
@@ -146,11 +145,14 @@ export const useTesting = create<TestingState>((set) => ({
   },
 
   clearProxy: async () => {
-    const d = device();
-    if (!d) return;
-    const port = reversePort(get().proxy);
-    await shell(d, tr().testing.logs.proxyOff, "settings put global http_proxy :0");
-    if (port) await native.run("adb", ["-s", d.serial, "reverse", "--remove", `tcp:${port}`], 15000);
+    await Promise.all(
+      targetDevices().map(async (d) => {
+        // Each device may point at a different port, so read its own proxy before removing the reverse rule.
+        const port = reversePort(parseProxy((await native.run("adb", ["-s", d.serial, "shell", "settings get global http_proxy"], 10000)).output));
+        await shell(d, tr().testing.logs.proxyOff, "settings put global http_proxy :0");
+        if (port) await native.run("adb", ["-s", d.serial, "reverse", "--remove", `tcp:${port}`], 15000);
+      }),
+    );
     await get().load();
   },
 
@@ -167,7 +169,6 @@ export const useTesting = create<TestingState>((set) => ({
   setData: (on) => change(tr().testing.logs.data(on), `svc data ${on ? "enable" : "disable"}`),
 
   openLocaleSettings: async () => {
-    const d = device();
-    if (d) await shell(d, tr().testing.languageSettings, "am start -a android.settings.LOCALE_SETTINGS");
+    await Promise.all(targetDevices().map((d) => shell(d, tr().testing.languageSettings, "am start -a android.settings.LOCALE_SETTINGS")));
   },
 }));

@@ -27,6 +27,9 @@ export const SECTION_GROUPS: { group: SectionGroup; sections: ToolsetSection[] }
 /** Sections that work across devices and need no device picked. */
 export const DEVICELESS: ToolsetSection[] = ["wireless", "crashes"];
 
+/** Sections whose actions can go to every connected device at once. */
+export const BROADCAST: ToolsetSection[] = ["control", "testing"];
+
 export type DevToggle = "showTouches" | "pointerLocation" | "animationsOff" | "darkMode" | "stayAwake" | "layoutBounds";
 
 /** Labels live in the translations under `toolset.developer.toggles`. */
@@ -86,6 +89,8 @@ interface ToolsetState {
   connectHost: string;
   pairHost: string;
   pairCode: string;
+  /** Send actions of broadcast sections to every ready device, not just the picked one. */
+  broadcast: boolean;
 
   set: (partial: Partial<ToolsetState>) => void;
   setSection: (section: ToolsetSection) => void;
@@ -145,14 +150,22 @@ async function adbLogged(args: string[], d?: Device | null, timeoutMs = 60000) {
   return r;
 }
 
-function runOnDevice(title: string, command: string) {
+/** The picked device, or every ready device while broadcasting in a broadcast section. */
+export function targetDevices(): Device[] {
   const d = device();
-  if (!d) return;
-  log("command", `${title} → ${displayName(d)}`);
-  void shell(d, command).then((r) => {
-    const out = r.output.trim();
-    if (out) log(r.status === 0 ? "output" : "error", out);
-  });
+  if (!d) return [];
+  const s = get();
+  return s.broadcast && BROADCAST.includes(s.section) ? readyDevices(useInstaller.getState()) : [d];
+}
+
+function runOnDevice(title: string, command: string) {
+  for (const d of targetDevices()) {
+    log("command", `${title} → ${displayName(d)}`);
+    void shell(d, command).then((r) => {
+      const out = r.output.trim();
+      if (out) log(r.status === 0 ? "output" : "error", out);
+    });
+  }
 }
 
 let logcatStream: string | null = null;
@@ -224,6 +237,7 @@ export const useToolset = create<ToolsetState>((set) => ({
   connectHost: "",
   pairHost: "",
   pairCode: "",
+  broadcast: false,
 
   set: (partial) => set(partial),
 
@@ -508,8 +522,7 @@ export const useToolset = create<ToolsetState>((set) => ({
   },
 
   screenshot: () => {
-    const d = device();
-    if (d) void useInstaller.getState().screenshot(d);
+    for (const d of targetDevices()) void useInstaller.getState().screenshot(d);
   },
 
   toggleRecording: async () => {
@@ -645,9 +658,13 @@ export const useToolset = create<ToolsetState>((set) => ({
       layoutBounds: `setprop debug.layout ${on ? "true" : "false"}; service call activity 1599295570 > /dev/null`,
     };
     const m = tr().toolset.developer;
-    log("command", `${m.toggles[toggle].title}: ${on ? m.on : m.off} → ${displayName(d)}`);
-    const r = await shell(d, commands[toggle]);
-    if (r.status !== 0) log("error", r.output.trim());
+    await Promise.all(
+      targetDevices().map(async (target) => {
+        log("command", `${m.toggles[toggle].title}: ${on ? m.on : m.off} → ${displayName(target)}`);
+        const r = await shell(target, commands[toggle]);
+        if (r.status !== 0) log("error", r.output.trim());
+      }),
+    );
     await get().loadToggles();
   },
 

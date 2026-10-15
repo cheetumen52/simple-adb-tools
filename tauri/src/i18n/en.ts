@@ -158,6 +158,14 @@ export const en: Messages = {
     lastKicker: "last installed app",
     lastEmpty: "After your first install you'll find quick app controls here: launch, restart, logcat and more.",
     pickDevice: "select a device",
+    selectAll: "Select all",
+    selectNone: "Clear selection",
+    selectedCount: (n, total) => `${n} of ${total} selected`,
+    screenshotSelected: "Screenshot selected",
+    mirrorSelected: "Mirror selected",
+    stopMirrors: "Stop mirroring",
+    batteryHelp: "Battery",
+    progress: { running: "installing…", ok: "done", failed: "failed" },
   },
 
   installer: {
@@ -227,6 +235,8 @@ export const en: Messages = {
     noPhone: "No phone connected",
     noPhoneHint: "The tools unlock once you connect a phone with USB debugging or over Wi‑Fi.",
     guide: "Guide →",
+    broadcast: (n) => `All devices (${n})`,
+    broadcastHelp: "Actions in this section go to every connected device at once. The state shown is the selected device's.",
 
     overview: {
       deviceKicker: "device",

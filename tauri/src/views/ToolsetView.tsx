@@ -4,11 +4,11 @@ import {
   Lock, MonitorSmartphone, Network, Pause, Play, Power, RefreshCw, Save, Settings, Square, Sun, Terminal, Trash2, Undo2, Volume1, Volume2,
   Wifi, WifiOff, Hand, Bug, FlaskConical,
 } from "lucide-react";
-import { displayName, isEmulator, isWireless } from "../lib/parse";
+import { displayName, isEmulator, isReady, isWireless } from "../lib/parse";
 import { tabNumber, useApp } from "../state/app";
 import { useToolchain } from "../state/toolchain";
 import { useInstaller } from "../state/installer";
-import { DEVICELESS, LOG_LEVELS, SECTION_GROUPS, useToolset, type LogLevel, type ToolsetSection } from "../state/toolset";
+import { BROADCAST, DEVICELESS, LOG_LEVELS, SECTION_GROUPS, useToolset, type LogLevel, type ToolsetSection } from "../state/toolset";
 import { useCrashes } from "../state/crashes";
 import { CrashesSection } from "./toolset/CrashesSection";
 import { TestingSection } from "./toolset/TestingSection";
@@ -624,6 +624,8 @@ export function ToolsetView() {
   const serial = device?.serial;
   const first = useRef(true);
   const m = useT().toolset;
+  const broadcast = useToolset((s) => s.broadcast);
+  const readyCount = useInstaller((s) => s.devices.filter(isReady).length);
 
   useEffect(() => {
     if (first.current) {
@@ -658,7 +660,14 @@ export function ToolsetView() {
             <div className="toolhead-title">{m.sections[section]}</div>
             <div className="lede">{m.descriptions[section]}</div>
           </div>
-          {!deviceless && <DevicePicker />}
+          {!deviceless && (
+            <div className="stack" style={{ gap: 8, alignItems: "flex-end" }}>
+              <DevicePicker />
+              {BROADCAST.includes(section) && readyCount > 1 && (
+                <Switch label={m.broadcast(readyCount)} title={m.broadcastHelp} checked={broadcast} onChange={(v) => useToolset.getState().set({ broadcast: v })} />
+              )}
+            </div>
+          )}
         </div>
         {locked ? (
           <div className="scroll" style={{ padding: "0 24px" }}>
