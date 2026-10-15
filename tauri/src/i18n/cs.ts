@@ -158,6 +158,14 @@ export const cs = {
     lastKicker: "poslední nainstalovaná aplikace",
     lastEmpty: "Po první instalaci tu najdeš rychlé ovládání aplikace: spuštění, restart, logcat a další.",
     pickDevice: "vyber zařízení",
+    selectAll: "Vybrat vše",
+    selectNone: "Zrušit výběr",
+    selectedCount: (n: number, total: number) => `Vybráno ${n} z ${total}`,
+    screenshotSelected: "Screenshot vybraných",
+    mirrorSelected: "Zrcadlit vybraná",
+    stopMirrors: "Ukončit zrcadlení",
+    batteryHelp: "Baterie",
+    progress: { running: "instaluji…", ok: "hotovo", failed: "selhalo" },
   },
 
   installer: {
@@ -227,6 +235,8 @@ export const cs = {
     noPhone: "Žádný připojený telefon",
     noPhoneHint: "Nástroje se odemknou, jakmile připojíš telefon s laděním USB nebo přes Wi‑Fi.",
     guide: "Návod →",
+    broadcast: (n: number) => `Na všechna zařízení (${n})`,
+    broadcastHelp: "Akce v této sekci se pošlou na všechna připojená zařízení najednou. Stav ukazuje vybrané zařízení.",
 
     overview: {
       deviceKicker: "zařízení",

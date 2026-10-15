@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { recentDevice, useRecentApps, type RecentAction } from "../state/recentApps";
 import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
-import { AlignLeft, Eraser, Play, RefreshCcw, Settings, Square, Trash2 } from "lucide-react";
+import { AlignLeft, BatteryMedium, Eraser, Play, RefreshCcw, Settings, Square, Trash2 } from "lucide-react";
 import { useToolset } from "../state/toolset";
 import { latestCrash, useCrashes } from "../state/crashes";
 import { Cable, Camera, Folder, Monitor, MonitorSmartphone, MonitorX, MoreHorizontal, OctagonX, Package, RefreshCw, RotateCw, Smartphone, Wifi, WifiOff, Wrench, X } from "lucide-react";
@@ -39,6 +39,11 @@ function DeviceRow({ device }: { device: Device }) {
           <span style={{ fontWeight: 600, fontSize: 13.5 }}>{displayName(device)}</span>
           <div className="row" style={{ gap: 6 }}>
             {d && <span className="caption secondary">Android {d.android}{d.manufacturer ? ` · ${d.manufacturer}` : ""}</span>}
+            {d?.battery != null && (
+              <span className="caption secondary row" style={{ gap: 3 }} title={t.install.batteryHelp}>
+                <BatteryMedium size={12} color={d.battery <= 15 ? "var(--danger)" : "var(--text-muted)"} />{d.battery} %
+              </span>
+            )}
             {d && <span className="c-muted">·</span>}
             <span className="mono-sm c-muted selectable">{device.serial}</span>
           </div>
@@ -60,7 +65,12 @@ function DeviceRow({ device }: { device: Device }) {
 }
 
 function DevicesSection() {
-  const { devices, running, restartAdb, manualRefresh, manualRefreshing } = useInstaller();
+  const { devices, selected, running, restartAdb, manualRefresh, manualRefreshing, selectAll, screenshot } = useInstaller();
+  const mirror = useMirror();
+  const scrcpyReady = useToolchain((s) => s.scrcpy.kind === "found");
+  const ready = devices.filter(isReady);
+  const chosen = ready.filter((d) => selected.includes(d.serial));
+  const mirroring = chosen.some((d) => mirror.running[d.serial]);
   useWireless((s) => s.states);
   const adbReady = useToolchain((s) => s.adb.kind === "found");
   const setTab = useApp((s) => s.setTab);
@@ -98,6 +108,20 @@ function DevicesSection() {
           </Card>
         )
       )}
+      {ready.length > 1 && (
+        <div className="batchbar">
+          <Checkbox checked={chosen.length === ready.length} onChange={() => selectAll(chosen.length !== ready.length)} />
+          <span className="caption secondary">{m.selectedCount(chosen.length, ready.length)}</span>
+          <Button variant="link" onClick={() => selectAll(chosen.length !== ready.length)}>{chosen.length === ready.length ? m.selectNone : m.selectAll}</Button>
+          <div className="spacer" />
+          <Button small icon={<Camera size={13} />} disabled={!chosen.length} onClick={() => chosen.forEach((d) => void screenshot(d))}>{m.screenshotSelected}</Button>
+          {scrcpyReady && (
+            <Button small icon={mirroring ? <MonitorX size={13} /> : <MonitorSmartphone size={13} />} disabled={!chosen.length} onClick={() => chosen.forEach((d) => (mirroring ? mirror.stop(d) : void mirror.start(d)))}>
+              {mirroring ? m.stopMirrors : m.mirrorSelected}
+            </Button>
+          )}
+        </div>
+      )}
       {devices.map((d) => <DeviceRow key={d.serial} device={d} />)}
       {reconnecting.map((k) => (
         <Card compact key={k.address}>
@@ -117,9 +141,10 @@ function DevicesSection() {
 }
 
 function DropZone() {
-  const { running, currentTitle, startedAt, queuedCount } = useInstaller();
+  const { running, currentTitle, startedAt, queuedCount, progress } = useInstaller();
   const over = useDrag((s) => s.over) === "install";
   const m = useT().install;
+  const rows = Object.entries(progress);
   return (
     <div className={`dropzone${over ? " active" : ""}`} data-drop="install">
       {running ? (
@@ -130,6 +155,15 @@ function DropZone() {
             {startedAt && <Elapsed since={startedAt} />}
             {queuedCount > 0 && <span className="mono c-muted">{m.queued(queuedCount)}</span>}
           </div>
+          {rows.length > 1 && (
+            <div className="row wrap" style={{ justifyContent: "center", gap: 6, marginTop: 4 }}>
+              {rows.map(([serial, p]) => (
+                <Pill key={serial} color={p.state === "ok" ? "var(--light-cyan)" : p.state === "failed" ? "var(--danger)" : "var(--accent)"}>
+                  {p.device} · {m.progress[p.state]}
+                </Pill>
+              ))}
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -152,7 +186,7 @@ function FailureBanner() {
         <OctagonX size={18} color="var(--danger)" />
         <div className="stack" style={{ flex: 1, gap: 4 }}>
           <Kicker color="var(--danger)">{t.install.failureKicker}</Kicker>
-          <span style={{ fontSize: 13 }}>{t.failures[failureHint.reason]}</span>
+          <span style={{ fontSize: 13 }}>{failureHint.device ? `${failureHint.device}: ` : ""}{t.failures[failureHint.reason]}</span>
         </div>
         {failureHint.suggestReinstall && failureHint.file && (
           <Button variant="primary" small onClick={() => enqueueInstall([failureHint.file!], true)}>{t.install.tryReinstall}</Button>
@@ -386,7 +420,7 @@ function LastAppSection() {
               <div className="stack" style={{ gap: 3, flex: 1, minWidth: 0 }}>
                 <span className="title-sm">{last.label ?? last.pkg}</span>
                 <span className="mono-sm c-muted truncate selectable">
-                  {last.pkg}  ·  {last.version}  ·  {timeAgo(last.at)}  ·  {last.devices.join(", ")}
+                  {[last.pkg, last.version, timeAgo(last.at), last.devices.join(", ")].filter(Boolean).join("  ·  ")}
                 </span>
               </div>
               {crash && (

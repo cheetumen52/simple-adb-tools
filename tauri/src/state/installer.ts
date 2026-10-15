@@ -30,6 +30,15 @@ export interface DeviceDetails {
   android: string;
   manufacturer: string;
   hardwareSerial: string | null;
+  battery: number | null;
+}
+
+export type InstallState = "running" | "ok" | "failed";
+
+/** Per-device state of the running install, keyed by serial. */
+export interface InstallProgress {
+  device: string;
+  state: InstallState;
 }
 
 type Job = { kind: "install"; files: string[]; reinstall: boolean } | { kind: "uninstall"; pkg: string };
@@ -57,7 +66,8 @@ interface InstallerState {
   startedAt: number | null;
   lastResult: boolean | null;
   queuedCount: number;
-  failureHint: FailureHint | null;
+  failureHint: (FailureHint & { device?: string }) | null;
+  progress: Record<string, InstallProgress>;
   reinstallMode: boolean;
   watchedFolders: string[];
   autoInstall: boolean;
@@ -70,6 +80,7 @@ interface InstallerState {
   manualRefresh: () => Promise<void>;
   applyDevices: (devices: Device[]) => void;
   toggleSelected: (serial: string) => void;
+  selectAll: (on: boolean) => void;
   restartAdb: () => Promise<void>;
   screenshot: (device: Device) => Promise<void>;
   scanApks: () => Promise<void>;
@@ -119,13 +130,26 @@ async function adb(args: string[], timeoutMs?: number) {
   return native.run("adb", args, timeoutMs);
 }
 
+const detailsLoadedAt = new Map<string, number>();
+// Battery changes slowly; the rest never does while the device stays connected.
+const DETAILS_REFRESH_MS = 60_000;
+
 function loadDetails(device: Device) {
-  set({ details: { ...get().details, [device.serial]: { android: "…", manufacturer: "", hardwareSerial: null } } });
-  adb(["-s", device.serial, "shell", "getprop ro.build.version.release; getprop ro.product.manufacturer; getprop ro.serialno"], 15000)
+  detailsLoadedAt.set(device.serial, Date.now());
+  if (!get().details[device.serial]) {
+    set({ details: { ...get().details, [device.serial]: { android: "…", manufacturer: "", hardwareSerial: null, battery: null } } });
+  }
+  adb(["-s", device.serial, "shell", "getprop ro.build.version.release; getprop ro.product.manufacturer; getprop ro.serialno; dumpsys battery | grep -m1 ' level:'"], 15000)
     .then((r) => {
       const lines = r.output.split("\n").map((l) => l.trim());
       const manufacturer = lines[1] ? lines[1].charAt(0).toUpperCase() + lines[1].slice(1).toLowerCase() : "";
-      set({ details: { ...get().details, [device.serial]: { android: lines[0] || "?", manufacturer, hardwareSerial: lines[2] || null } } });
+      const battery = Number(lines[3]?.match(/level: (\d+)/)?.[1]);
+      set({
+        details: {
+          ...get().details,
+          [device.serial]: { android: lines[0] || "?", manufacturer, hardwareSerial: lines[2] || null, battery: Number.isNaN(battery) ? null : battery },
+        },
+      });
     })
     .catch(() => {});
 }
@@ -229,10 +253,11 @@ async function waitForTargets(): Promise<Device[] | null> {
   return null;
 }
 
-async function installOne(device: Device, file: string, pkg: string | null, reinstall: boolean): Promise<boolean> {
+async function installOne(device: Device, file: string, pkg: string | null, reinstall: boolean, tagged: boolean): Promise<boolean> {
   const name = baseName(file);
   const label = displayName(device);
-  const out = (line: string) => log("output", line);
+  // Parallel installs interleave their output, so each line names its device.
+  const out = (line: string) => log("output", tagged ? `[${label}] ${line}` : line);
 
   if (reinstall) {
     if (pkg) {
@@ -263,7 +288,7 @@ async function installOne(device: Device, file: string, pkg: string | null, rein
     lastOutput = r.output;
     if (!parseFailure(lastOutput).retryable) break;
   }
-  const hint = { ...parseFailure(lastOutput), file };
+  const hint = { ...parseFailure(lastOutput), file, device: tagged ? label : undefined };
   set({ failureHint: hint });
   log("error", `✗ ${name} → ${label}: ${tr().failures[hint.reason]}`);
   return false;
@@ -308,12 +333,17 @@ async function runJob(job: Job) {
         for (const file of job.files) {
           const details = await apkDetails(file);
           const pkg = details?.pkg ?? null;
-          const installedOn: string[] = [];
-          for (const device of devices) {
-            const success = await installOne(device, file, pkg, job.reinstall);
-            if (success) installedOn.push(displayName(device));
-            ok = success && ok;
-          }
+          const tagged = devices.length > 1;
+          set({ progress: Object.fromEntries(devices.map((d) => [d.serial, { device: displayName(d), state: "running" as InstallState }])) });
+          const results = await Promise.all(
+            devices.map(async (device) => {
+              const success = await installOne(device, file, pkg, job.reinstall, tagged);
+              set({ progress: { ...get().progress, [device.serial]: { device: displayName(device), state: success ? "ok" : "failed" } } });
+              return success;
+            }),
+          );
+          const installedOn = devices.filter((_, i) => results[i]).map(displayName);
+          ok = results.every(Boolean) && ok;
           if (details && installedOn.length) {
             const last = { pkg: details.pkg, label: details.label, version: apkVersion(details), file, devices: installedOn, at: Date.now() };
             set({ lastInstalled: last });
@@ -322,17 +352,20 @@ async function runJob(job: Job) {
           invalidateInstalled(pkg);
         }
       } else {
-        for (const device of devices) {
-          log("command", `adb uninstall ${job.pkg} → ${displayName(device)}`);
-          const r = await streamToEnd("adb", ["-s", device.serial, "uninstall", job.pkg], (l) => log("output", l));
-          ok = r.status === 0 && ok;
-        }
+        const results = await Promise.all(
+          devices.map(async (device) => {
+            log("command", `adb uninstall ${job.pkg} → ${displayName(device)}`);
+            const r = await streamToEnd("adb", ["-s", device.serial, "uninstall", job.pkg], (l) => log("output", devices.length > 1 ? `[${displayName(device)}] ${l}` : l));
+            return r.status === 0;
+          }),
+        );
+        ok = results.every(Boolean) && ok;
         invalidateInstalled(job.pkg);
       }
     }
   }
 
-  set({ running: false, currentTitle: "", startedAt: null, lastResult: ok });
+  set({ running: false, currentTitle: "", startedAt: null, lastResult: ok, progress: {} });
   log(ok ? "success" : "error", ok ? tr().installer.done : tr().installer.failed);
   void updateBadge();
   void notify(ok, title);
@@ -367,6 +400,7 @@ export const useInstaller = create<InstallerState>(() => ({
   lastResult: null,
   queuedCount: 0,
   failureHint: null,
+  progress: {},
   reinstallMode: false,
   watchedFolders: load<string[]>("watchedFolders", []),
   autoInstall: load("autoInstall", false),
@@ -414,7 +448,8 @@ export const useInstaller = create<InstallerState>(() => ({
     }
     const changed = JSON.stringify(devices) !== JSON.stringify(get().devices);
     set(changed ? { devices, selected } : { selected });
-    for (const d of devices) if (isReady(d) && !get().details[d.serial]) loadDetails(d);
+    const now = Date.now();
+    for (const d of devices) if (isReady(d) && (!get().details[d.serial] || now - (detailsLoadedAt.get(d.serial) ?? 0) > DETAILS_REFRESH_MS)) loadDetails(d);
     loadInstalledVersions();
   },
 
@@ -422,6 +457,8 @@ export const useInstaller = create<InstallerState>(() => ({
     const selected = get().selected;
     set({ selected: selected.includes(serial) ? selected.filter((s) => s !== serial) : [...selected, serial] });
   },
+
+  selectAll: (on) => set({ selected: on ? get().devices.map((d) => d.serial) : [] }),
 
   restartAdb: async () => {
     if (!toolReady("adb") || get().running) return;
@@ -509,12 +546,14 @@ export const useInstaller = create<InstallerState>(() => ({
     };
     const title = tr().actions[action];
     const command = commands[action];
-    for (const device of devices) {
-      log("command", `${title} ${last.pkg} → ${displayName(device)}`);
-      const r = await adb(["-s", device.serial, "shell", command], 30000);
-      const out = r.output.split("\n").filter((l) => l.trim() && !l.includes("Events injected") && !l.startsWith("  bash arg")).join("\n").trim();
-      if (out) log(r.status === 0 ? "output" : "error", out);
-    }
+    await Promise.all(
+      devices.map(async (device) => {
+        log("command", `${title} ${last.pkg} → ${displayName(device)}`);
+        const r = await adb(["-s", device.serial, "shell", command], 30000);
+        const out = r.output.split("\n").filter((l) => l.trim() && !l.includes("Events injected") && !l.startsWith("  bash arg")).join("\n").trim();
+        if (out) log(r.status === 0 ? "output" : "error", out);
+      }),
+    );
   },
 }));
 
