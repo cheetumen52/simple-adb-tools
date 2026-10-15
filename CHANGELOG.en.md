@@ -6,8 +6,11 @@ All notable changes to Simple ADB tools. The Czech version is in [CHANGELOG.md](
 
 ### Added
 - Crash watch: the app follows logcat on every connected device and shows a crash, native crash or ANR with its stack trace, a notification and a header badge. From a crash you can restart the app, open its logcat, or copy or save the report.
+- Testing section: one-click proxy for Charles, Proxyman or mitmproxy (through adb reverse or over the network), airplane mode, Wi‑Fi and mobile data, font size, display density, dark mode, battery simulation and Doze.
+- Apps: grant or revoke runtime permissions and set the app language (Android 13+), including Arabic and Hebrew for RTL testing.
 
 ### Changed
+- The Developer section is now part of Testing.
 - The ADB toolset has a grouped sidebar and a heading with a description for every section. Narrow windows show icons only.
 
 ## [1.2.1] - 2026-10-14

@@ -9,16 +9,18 @@ import { log } from "./log";
 import { useApp } from "./app";
 import { readyDevices, useInstaller } from "./installer";
 import { useWireless } from "./wireless";
+import { useTesting } from "./testing";
 import { tr } from "../i18n";
+import { parseAppLocales, parseRuntimePermissions, type RuntimePermission } from "../lib/devicetools";
 
-export type ToolsetSection = "overview" | "mirror" | "apps" | "logcat" | "crashes" | "control" | "wireless" | "developer" | "shell";
+export type ToolsetSection = "overview" | "mirror" | "apps" | "logcat" | "crashes" | "control" | "wireless" | "testing" | "shell";
 export type SectionGroup = "device" | "apps" | "testing" | "advanced";
 
 /** Sidebar order; labels live in the translations under `toolset.sections` and `toolset.groups`. */
 export const SECTION_GROUPS: { group: SectionGroup; sections: ToolsetSection[] }[] = [
   { group: "device", sections: ["overview", "mirror", "control"] },
   { group: "apps", sections: ["apps", "logcat", "crashes"] },
-  { group: "testing", sections: ["developer", "wireless"] },
+  { group: "testing", sections: ["testing", "wireless"] },
   { group: "advanced", sections: ["shell"] },
 ];
 
@@ -64,6 +66,9 @@ interface ToolsetState {
   packageQuery: string;
   selectedPackage: string | null;
   packageDetails: InfoRow[];
+  packagePermissions: RuntimePermission[];
+  /** null = per-app language unsupported (Android < 13). */
+  packageLocales: string[] | null;
   logcat: LogcatLine[];
   logcatRunning: boolean;
   logcatLevel: LogLevel;
@@ -93,6 +98,8 @@ interface ToolsetState {
   push: (paths: string[]) => Promise<void>;
   loadPackages: () => Promise<void>;
   selectPackage: (pkg: string) => Promise<void>;
+  setPermission: (pkg: string, names: string[], grant: boolean) => Promise<void>;
+  setAppLocale: (pkg: string, locale: string | null) => Promise<void>;
   launch: (pkg: string) => void;
   forceStop: (pkg: string) => void;
   clearData: (pkg: string) => void;
@@ -198,6 +205,8 @@ export const useToolset = create<ToolsetState>((set) => ({
   packageQuery: "",
   selectedPackage: null,
   packageDetails: [],
+  packagePermissions: [],
+  packageLocales: null,
   logcat: [],
   logcatRunning: false,
   logcatLevel: "D",
@@ -234,7 +243,10 @@ export const useToolset = create<ToolsetState>((set) => ({
     const s = get();
     if (s.section === "overview") void s.loadInfo();
     if (s.section === "apps" && !s.packages.length) void s.loadPackages();
-    if (s.section === "developer") void s.loadToggles();
+    if (s.section === "testing") {
+      void s.loadToggles();
+      void useTesting.getState().load();
+    }
   },
 
   relocalize: () => {
@@ -338,10 +350,14 @@ export const useToolset = create<ToolsetState>((set) => ({
   },
 
   selectPackage: async (pkg) => {
-    set({ selectedPackage: pkg, packageDetails: [] });
+    // Re-reading the same app (after a permission or language change) keeps the old values on screen.
+    if (get().selectedPackage !== pkg) set({ selectedPackage: pkg, packageDetails: [], packagePermissions: [], packageLocales: null });
     const d = device();
     if (!d) return;
-    const out = (await shell(d, `dumpsys package ${shQuote(pkg)}`)).output;
+    const [out, locales] = await Promise.all([
+      shell(d, `dumpsys package ${shQuote(pkg)}`).then((r) => r.output),
+      shell(d, `cmd locale get-app-locales ${shQuote(pkg)}`, 10000).then((r) => r.output),
+    ]);
     const value = (key: string) => out.match(new RegExp(`${key}=([^\\n]+)`))?.[1]?.trim() ?? "?";
     if (get().selectedPackage !== pkg) return;
     const m = tr().toolset.info;
@@ -352,7 +368,26 @@ export const useToolset = create<ToolsetState>((set) => ({
         { label: m.installed, value: value("firstInstallTime") },
         { label: m.updated, value: value("lastUpdateTime") },
       ],
+      packagePermissions: parseRuntimePermissions(out),
+      packageLocales: parseAppLocales(locales),
     });
+  },
+
+  setPermission: async (pkg, names, grant) => {
+    const d = device();
+    if (!d || !names.length) return;
+    log("command", `${tr().testing.logs.permission(names.map((n) => n.replace(/^android\.permission\./, "")).join(", "), grant)} → ${displayName(d)}`);
+    const r = await shell(d, names.map((n) => `pm ${grant ? "grant" : "revoke"} ${shQuote(pkg)} ${n}`).join("; "));
+    if (r.output.trim()) log(r.status === 0 ? "output" : "error", r.output.trim());
+    if (get().selectedPackage === pkg) await get().selectPackage(pkg);
+  },
+
+  setAppLocale: async (pkg, locale) => {
+    const d = device();
+    if (!d) return;
+    log("command", `${tr().testing.logs.appLocale(pkg, locale)} → ${displayName(d)}`);
+    await shell(d, `cmd locale set-app-locales ${shQuote(pkg)}${locale ? ` --locales ${shQuote(locale)}` : ""}`);
+    if (get().selectedPackage === pkg) await get().selectPackage(pkg);
   },
 
   launch: (pkg) => runOnDevice(`${tr().actions.launch} ${pkg}`, `monkey -p ${shQuote(pkg)} -c android.intent.category.LAUNCHER 1`),

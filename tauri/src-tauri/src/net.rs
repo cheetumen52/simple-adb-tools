@@ -27,6 +27,24 @@ pub async fn probe_tcp(host: String, port: u16, timeout_ms: Option<u64>) -> Stri
     .to_string()
 }
 
+/// The computer's primary LAN address, for pointing a phone's proxy at it. Connecting a UDP socket only
+/// picks the outgoing interface; no packet is sent.
+#[tauri::command]
+pub fn local_ips() -> Vec<String> {
+    let Ok(socket) = std::net::UdpSocket::bind("0.0.0.0:0") else {
+        return Vec::new();
+    };
+    if socket.connect("192.0.2.1:80").is_err() {
+        return Vec::new();
+    }
+    match socket.local_addr() {
+        Ok(addr) if !addr.ip().is_loopback() && !addr.ip().is_unspecified() => {
+            vec![addr.ip().to_string()]
+        }
+        _ => Vec::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::probe_tcp;

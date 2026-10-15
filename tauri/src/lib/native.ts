@@ -41,6 +41,7 @@ export const native = {
     invoke<RunResult>("run_tool_to_file", { tool, args, path }),
   probeTcp: (host: string, port: number, timeoutMs?: number) =>
     invoke<ProbeResult>("probe_tcp", { host, port, timeoutMs: timeoutMs ?? null }),
+  localIps: () => invoke<string[]>("local_ips"),
   listApks: (folders: string[], limit: number) => invoke<ApkEntry[]>("list_apks", { folders, limit }),
   systemPaths: () => invoke<SystemPaths>("system_paths"),
   writeText: (path: string, contents: string) => invoke<void>("write_text", { path, contents }),
