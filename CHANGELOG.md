@@ -4,6 +4,8 @@ Všechny podstatné změny Simple ADB tools. Anglická verze je v [CHANGELOG.en.
 
 ## [Nevydáno]
 
+## [1.3.0] - 2026-10-15
+
 ### Přidáno
 - Hlídání pádů: aplikace sleduje logcat všech připojených zařízení a pád, nativní pád nebo ANR ukáže i se stack trace, notifikací a odznakem v hlavičce. Z pádu jde aplikaci rovnou restartovat, otevřít její logcat, zkopírovat nebo uložit report.
 - Sekce Testování: proxy pro Charles, Proxyman nebo mitmproxy jedním klikem (přes adb reverse i přes síť), režim letadlo, Wi‑Fi a mobilní data, velikost písma, hustota displeje, tmavý režim, simulace baterie a Doze.

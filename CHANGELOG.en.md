@@ -4,6 +4,8 @@ All notable changes to Simple ADB tools. The Czech version is in [CHANGELOG.md](
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-15
+
 ### Added
 - Crash watch: the app follows logcat on every connected device and shows a crash, native crash or ANR with its stack trace, a notification and a header badge. From a crash you can restart the app, open its logcat, or copy or save the report.
 - Testing section: one-click proxy for Charles, Proxyman or mitmproxy (through adb reverse or over the network), airplane mode, Wi‑Fi and mobile data, font size, display density, dark mode, battery simulation and Doze.
